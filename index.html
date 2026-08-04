@@ -111,6 +111,7 @@ select.statut-select {
 select.statut-select:focus { outline: 1.5px solid var(--bordeaux); }
 .st-neutral { background: #f0f0f0; color: #666; }
 .st-connexion { background: #e3edfa; color: #2f5fa8; }
+.st-reprise { background: #e2f3f0; color: #1c7c6e; }
 .st-r1 { background: var(--bordeaux-pale); color: var(--bordeaux); }
 .st-r2 { background: var(--bordeaux); color: #fff; }
 .st-conversation { background: var(--amber-pale); color: var(--amber); }
@@ -353,16 +354,31 @@ The last but not least 🙂
 Si tu as quelques minutes à m'accorder, ça me ferait plaisir d'en savoir un peu plus sur toi et sur ce qui t'a donné envie de me suivre ?
 
 Au plaisir de te lire, je te souhaite une belle fin de semaine.
-Marie`
+Marie`,
+  "Reprise de contact": `Hello {prenom},
+
+Ça fait un moment qu'on ne s'est pas parlé, comment vas-tu ?
+
+Je me permets de reprendre contact car de mon côté j'accompagne toujours les gens vers une vie de couple heureuse et équilibrée. J'ai même créé un programme d'exercices à faire en autonomie pour mieux comprendre ses schémas réactionnels.
+
+Aujourd'hui je me demandais où tu en étais de ton côté sur ce sujet.
+
+Si l'idée te plaît, j'aimerais te proposer un appel découverte (offert et sans engagement) pour t'aider à avancer sur une problématique de ton choix, ou au moins t'offrir un exercice de mon programme.
+
+Dis-moi simplement si ça t'intéresse, et sens-toi aussi parfaitement à l'aise de me dire que ce n'est pas le bon moment pour toi, je comprends très bien.
+
+Au plaisir d'avoir de tes nouvelles, je te souhaite une belle journée,
+Marie 🌞`
 };
 
 const STATUT_OPTIONS = [
-  "Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation",
+  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation",
   "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter"
 ];
 const STATUT_CLASS = {
   "Nouveau": "st-neutral",
   "En attente de connexion": "st-connexion",
+  "Reprise de contact": "st-reprise",
   "Première relance": "st-r1",
   "Deuxième relance": "st-r2",
   "En conversation": "st-conversation",
@@ -708,7 +724,8 @@ function messageTemplatesActuels() {
   return {
     "Nouveau": obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"],
     "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
-    "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"]
+    "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"],
+    "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"]
   };
 }
 function rappelsADemainHtml(prospects, obj) {
@@ -1119,7 +1136,7 @@ const RELANCE_STATUTS = ["Nouveau", "Première relance"];
 let afficherNouveau = false;
 let afficherHorsCible = false;
 let filtreStatut = "";
-const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant"];
+const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // Hierarchie d'attention par defaut (sans clic sur "trier") : ce que Marie doit
 // voir tous les jours remonte, ce qui ne demande pas d'action reste discret en
@@ -1129,7 +1146,7 @@ const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // voir renderProspectsSection) -- pas besoin d'eux ici.
 const STATUT_PRIORITE = [
   "Appel découverte", "En attente de paiement",
-  "Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Client"
+  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Client"
 ];
 
 let prospectSort = null; // { champ: 'statut' | 'temperature', dir: 1 | -1 }
@@ -1542,9 +1559,11 @@ function openTemplatesModal() {
     <textarea id="tpl-r1" rows="4" style="${zoneStyle}">${escapeHtml(t["Première relance"])}</textarea>
     <label style="margin-top:1rem;">Message — Deuxième relance</label>
     <textarea id="tpl-r2" rows="4" style="${zoneStyle}">${escapeHtml(t["Deuxième relance"])}</textarea>
+    <label style="margin-top:1rem;">Message — Reprise de contact</label>
+    <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
     <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
-    <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les 4 messages.</p>
+    <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les 5 messages.</p>
     <div class="modal-actions">
       <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
       <button class="btn" id="tpl-submit-btn" onclick="submitTemplates()">Enregistrer les templates</button>
@@ -1567,6 +1586,7 @@ async function submitTemplates() {
       templateNouveau: document.getElementById("tpl-nouveau").value,
       templatePremiereRelance: document.getElementById("tpl-r1").value,
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
+      templateRepriseContact: document.getElementById("tpl-reprise").value,
       templateRappel: document.getElementById("tpl-rappel").value
     });
   } catch (e) {
