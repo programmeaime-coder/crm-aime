@@ -1,0 +1,6 @@
+.DS_Store
+crm-aime.zip
+
+# Contient le mot de passe du CRM et l'ID du Google Sheet en clair -- jamais
+# sur GitHub (public), reste uniquement local + dans l'editeur Apps Script.
+Code.gs

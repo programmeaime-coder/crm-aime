@@ -1,0 +1,1756 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM — AIME by M.</title>
+<style>
+@font-face { font-family: 'Cormorant Garamond'; src: url('fonts/cormorant-garamond-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Cormorant Garamond'; src: url('fonts/cormorant-garamond-semibold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Special Elite'; src: url('fonts/special-elite.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Playfair Display'; src: url('fonts/playfair-regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DM Sans'; src: url('fonts/dm-sans-regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'DM Sans'; src: url('fonts/dm-sans-medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+
+:root {
+  --bordeaux: #8B1A1A;
+  --bordeaux-pale: #fbeceb;
+  --bordeaux-mid: #d98d84;
+  --amber: #b8824a;
+  --amber-pale: #faf1e6;
+  --text: #111111;
+  --text-muted: #767676;
+  --border: #e0e0e0;
+  --surface: #faf8f5;
+  --success: #15803d;
+  --success-pale: #eef7f0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text); line-height: 1.5; }
+
+.banner { background: var(--surface); color: var(--text); padding: 1.4rem 2.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid var(--border); }
+.banner__brand { display: flex; align-items: center; gap: 14px; }
+.banner__avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; object-position: center 20%; flex-shrink: 0; }
+.banner__title { font-family: 'Playfair Display', serif; font-style: italic; font-size: 21px; font-weight: 400; color: var(--bordeaux); line-height: 1.25; }
+.banner__title em { font-style: normal; opacity: 0.45; padding: 0 2px; }
+.banner__byline { font-size: 15px; font-weight: 300; opacity: 0.7; }
+.banner__date { font-family: 'DM Sans', sans-serif; font-size: 12px; letter-spacing: 0.06em; color: var(--text-muted); text-transform: capitalize; }
+
+.wrap { max-width: 1300px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+/* ─── Onglets ─── */
+.tabs { display: flex; gap: 0.5rem; border-bottom: 0.5px solid var(--border); margin-bottom: 2.5rem; }
+.tab-btn {
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-muted);
+  background: none; border: none; border-bottom: 2px solid transparent; padding: 0.85rem 0.25rem; margin-right: 1.75rem;
+  cursor: pointer; transition: color 0.15s ease;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--bordeaux); border-bottom-color: var(--bordeaux); }
+.tab-panel[hidden] { display: none; }
+
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 0.5px solid var(--border); margin-bottom: 3rem; }
+.stat { background: #fff; padding: 1.5rem 1.25rem; text-align: center; }
+.stat--accent { background: var(--surface); }
+.stat__value { font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 600; line-height: 1; }
+.stat__value--success { color: var(--success); }
+.stat__value--bordeaux { color: var(--bordeaux); }
+.stat__label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-top: 0.5rem; }
+
+.section { margin-bottom: 3.5rem; }
+.section__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.5px solid var(--border); }
+.section__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+
+.btn { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 9px 18px; border: 0.5px solid var(--border); background: var(--bordeaux); color: #fff; cursor: pointer; }
+.btn:hover { opacity: 0.88; }
+.btn--ghost { background: #fff; color: var(--text); }
+.recherche-input { font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 0.5rem 0.75rem; border: 0.5px solid var(--border); background: #fff; min-width: 180px; }
+.recherche-input:focus { outline: none; border-color: var(--bordeaux); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th { text-align: left; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; padding: 0 0.75rem 0.6rem; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+.th-sortable { cursor: pointer; user-select: none; }
+.th-sortable:hover { color: var(--text); }
+td { padding: 0.85rem 0.75rem; border-bottom: 0.5px solid var(--border); font-size: 14px; vertical-align: middle; }
+.table-compact { min-width: 0; }
+.table-compact th { padding: 0 0.5rem 0.4rem; font-size: 10px; }
+.table-compact td { padding: 0.35rem 0.5rem; font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+.name-cell { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; }
+.muted { color: var(--text-muted); font-size: 12.5px; }
+.empty-msg { padding: 2rem 0.75rem; color: var(--text-muted); font-size: 13px; text-align: center; }
+
+/* Table Prospects : colonnes figees (colgroup) + densite reduite, pour que le
+   maximum de colonnes tienne a l'ecran sans defilement horizontal. Les champs
+   texte trop longs (Poste, Note) sont tronques avec "..." plutot que d'etirer
+   la colonne -- la valeur complete reste visible/editable au clic (focus). */
+.table-prospects { table-layout: fixed; }
+.table-prospects th, .table-prospects td { padding: 0.5rem 0.45rem; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+.table-prospects th { text-align: center; }
+.table-prospects .note-input { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.table-prospects .note-input:focus { overflow: visible; text-overflow: clip; }
+.table-prospects select.statut-select, .table-prospects select.temp-select { max-width: 100%; padding: 3px 6px; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.table-prospects .link-btn { padding: 3px 0; font-size: 11.5px; }
+.table-prospects .row-actions { gap: 6px; }
+.table-prospects .name-cell { font-size: 15.5px; }
+
+select.statut-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  border-radius: 20px;
+  padding: 4px 10px;
+  border: 0.5px solid transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+}
+select.statut-select:focus { outline: 1.5px solid var(--bordeaux); }
+.st-neutral { background: #f0f0f0; color: #666; }
+.st-connexion { background: #e3edfa; color: #2f5fa8; }
+.st-r1 { background: var(--bordeaux-pale); color: var(--bordeaux); }
+.st-r2 { background: var(--bordeaux); color: #fff; }
+.st-conversation { background: var(--amber-pale); color: var(--amber); }
+.st-decouverte { background: var(--amber); color: #fff; }
+.st-attente { background: #c1440e; color: #fff; font-weight: 600; }
+.st-client { background: var(--success-pale); color: var(--success); }
+.st-recontact { background: #eef1f6; color: #5b6b85; }
+.st-non { background: #f0f0f0; color: #999; }
+
+select.temp-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  border-radius: 20px;
+  padding: 4px 10px;
+  border: 0.5px solid transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+}
+select.temp-select:focus { outline: 1.5px solid var(--bordeaux); }
+.t-vide { background: #f0f0f0; color: #999; }
+.t-froid { background: #eef1f6; color: #5b6b85; }
+.t-tiede { background: var(--bordeaux-pale); color: var(--bordeaux); }
+.t-chaud { background: var(--bordeaux); color: #fff; }
+
+select.formule-select {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  border-radius: 20px;
+  padding: 4px 10px;
+  border: 0.5px solid transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+}
+select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
+.f-vide { background: #f0f0f0; color: #999; }
+.f-autonomie { background: #f0f0f0; color: #666; }
+.f-miroir { background: var(--bordeaux-pale); color: var(--bordeaux); }
+.f-sur-mesure { background: var(--amber-pale); color: var(--amber); }
+
+.row-actions { display: flex; gap: 10px; justify-content: flex-end; white-space: nowrap; }
+.link-btn { font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text-muted); background: none; border: none; cursor: pointer; padding: 4px 2px; text-decoration: none; }
+.link-btn:hover { color: var(--text); }
+.link-btn--accent { color: var(--bordeaux); font-weight: 500; }
+
+.amount { font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 600; }
+
+.note-input { font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: var(--text-muted); border: none; border-bottom: 0.5px solid transparent; background: none; width: 100%; padding: 2px 0; }
+.note-input:hover, .note-input:focus { border-bottom-color: var(--border); outline: none; }
+
+.next-action { font-size: 12.5px; }
+.next-action--overdue { color: var(--bordeaux); font-weight: 600; }
+
+.paiement-cell { min-width: 160px; }
+.paiement-row { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.paiement-nb { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-muted); border: none; border-bottom: 0.5px solid var(--border); background: none; padding: 1px 0; }
+.paiement-date1 { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-muted); border: none; border-bottom: 0.5px solid var(--border); background: none; width: 92px; padding: 1px 0; }
+.paiement-reste { font-size: 11.5px; margin-bottom: 4px; }
+.paiement-reste b { font-family: 'Cormorant Garamond', serif; font-size: 14px; }
+.paiement-echec { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--bordeaux); cursor: pointer; }
+.paiement-label { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+
+.alerte-seuil { padding: 0.85rem 1.1rem; border: 0.5px solid; font-size: 12.5px; margin-top: 1rem; }
+.rappels-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.rappel-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.9rem; background: rgba(184,130,74,0.08); border: 0.5px solid #b8824a; font-size: 12.5px; }
+.rappel-item--block { display: block; }
+
+/* ─── Modale (ajout / conversion) ─── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(17,17,17,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1.5rem; }
+.modal-overlay[hidden] { display: none; }
+.modal { background: #fff; border: 0.5px solid var(--border); padding: 2rem; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; }
+.modal--wide { max-width: 640px; }
+.modal h2 { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; margin-bottom: 1.25rem; }
+.modal label { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; margin-top: 1rem; }
+.modal label:first-of-type { margin-top: 0; }
+.modal input, .modal select { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 8px 10px; border: 0.5px solid var(--border); background: #fff; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.75rem; }
+
+/* ─── Popup de relance quotidienne ─── */
+.reminder-popup .modal { max-width: 480px; }
+.reminder-popup h2 { color: var(--bordeaux); }
+.reminder-list { list-style: none; margin: 1rem 0; }
+.reminder-list li { padding: 0.6rem 0; border-bottom: 0.5px solid var(--border); font-size: 14px; }
+.reminder-list li:last-child { border-bottom: none; }
+.reminder-list .name-cell { font-size: 16px; }
+.reminder-tag { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ─── Tableau de bord : objectifs ─── */
+.objectifs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; }
+.objectif-card { border: 0.5px solid var(--border); padding: 1.25rem 1.4rem; }
+.objectif-card__label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.75rem; }
+.objectif-card__row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-bottom: 0.4rem; }
+.objectif-card__row:last-child { margin-bottom: 0; }
+.objectif-card__row .valeur { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; }
+.objectif-card__reste { color: var(--bordeaux); font-weight: 600; }
+.objectif-card__reste--atteint { color: var(--success); }
+.objectif-progress { height: 4px; background: var(--border); margin-top: 0.6rem; overflow: hidden; }
+.objectif-progress__fill { height: 100%; background: var(--bordeaux); transition: width 0.4s ease; }
+.objectif-progress--big { height: 8px; }
+
+.objectif-card--compact { padding: 1rem 1.25rem; }
+.objectif-card--compact .objectif-card__row { font-size: 12px; }
+.objectif-card--compact .valeur { font-size: 15px; }
+
+.objectif-card--featured { padding: 1.85rem 2rem; }
+.objectif-featured__main { display: flex; align-items: center; gap: 1.75rem; margin-bottom: 0.9rem; }
+.objectif-featured__pct { font-family: 'Cormorant Garamond', serif; font-size: 52px; font-weight: 600; line-height: 1; flex-shrink: 0; min-width: 100px; }
+.objectif-featured__detail { flex: 1; }
+.objectif-featured__note { font-size: 12.5px; color: var(--text-muted); margin-top: 0.85rem; }
+.objectifs-form { border: 0.5px solid var(--border); padding: 1.5rem; margin-top: 1rem; }
+.objectifs-form__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem 1.5rem; margin-bottom: 1.25rem; }
+.objectifs-form label { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.objectifs-form input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 8px 10px; border: 0.5px solid var(--border); }
+
+/* ─── Profil cible ─── */
+/* ─── Historique CA ─── */
+.historique-row { display: flex; gap: 1rem; align-items: flex-end; }
+.historique-bar { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.historique-bar__value { font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; }
+.historique-bar__track { width: 100%; max-width: 44px; height: 70px; background: var(--border); display: flex; align-items: flex-end; }
+.historique-bar__fill { width: 100%; background: var(--bordeaux); min-height: 2px; transition: height 0.3s ease; }
+.historique-bar__label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-top: 6px; }
+
+.historique-row--compact { gap: 0.5rem; }
+.historique-row--compact .historique-bar__value { font-size: 10px; }
+.historique-row--compact .historique-bar__label { font-size: 9px; }
+.historique-bar__track--compact { max-width: 24px; height: 40px; }
+
+.historique-side-by-side { display: flex; gap: 2.5rem; flex-wrap: wrap; align-items: flex-start; }
+.historique-side-by-side__main { flex: 1 1 420px; min-width: 300px; }
+.historique-side-by-side__aside { flex: 1 1 420px; min-width: 300px; }
+
+.profil-cible { border: 0.5px solid var(--border); background: var(--surface); padding: 1.5rem; }
+.profil-cible__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.85rem; }
+.profil-cible__list { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.profil-cible__chip { font-size: 12.5px; background: #fff; border: 0.5px solid var(--border); padding: 5px 12px; }
+.profil-cible__chip b { color: var(--bordeaux); }
+
+.loading-msg { text-align: center; padding: 4rem; color: var(--text-muted); font-size: 13px; }
+
+/* ─── Ecran de verrouillage ─── */
+.lock-screen { display: flex; justify-content: center; padding: 1.5rem 1rem; }
+.lock-screen[hidden] { display: none; }
+.tabs[hidden] { display: none; }
+.lock-card { max-width: 340px; width: 100%; text-align: center; }
+.lock-card__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem; }
+.lock-card__title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 600; margin-bottom: 1.5rem; }
+.lock-card input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 12px; border: 0.5px solid var(--border); margin-bottom: 1rem; text-align: center; }
+.lock-card .btn { width: 100%; }
+.lock-error { color: var(--bordeaux); font-size: 12.5px; margin-top: 0.85rem; display: none; }
+
+@media (max-width: 900px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .objectifs-grid, .objectifs-form__grid { grid-template-columns: 1fr; }
+  .wrap { padding: 1.5rem; }
+  table, thead, tbody, tr { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 0.5px solid var(--border); padding: 0.85rem 0; }
+  td { display: flex; justify-content: space-between; align-items: center; border: none; padding: 0.35rem 0; }
+  td::before { content: attr(data-label); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-right: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="banner__brand">
+    <img src="marie.jpg" alt="Marie" class="banner__avatar">
+    <div class="banner__title">CRM <em>—</em> AIME <span class="banner__byline">by M.</span></div>
+  </div>
+  <div class="banner__date" id="banner-date"></div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="lock-screen" id="lock-screen" hidden>
+    <div class="lock-card">
+      <div class="lock-card__eyebrow">Accès privé</div>
+      <h2 class="lock-card__title">Entre ton mot de passe</h2>
+      <input type="password" id="lock-pwd" placeholder="Mot de passe">
+      <button class="btn" id="lock-submit" onclick="submitPassword()">Entrer</button>
+      <p class="lock-error" id="lock-error"></p>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs" hidden>
+    <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
+    <button class="tab-btn" data-tab="prospects">Prospects</button>
+    <button class="tab-btn" data-tab="clients">Clients</button>
+  </div>
+
+  <div class="loading-msg" id="loading">Chargement…</div>
+
+  <div class="tab-panel" id="tab-dashboard" hidden></div>
+  <div class="tab-panel" id="tab-prospects" hidden></div>
+  <div class="tab-panel" id="tab-clients" hidden></div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay" hidden>
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<div class="modal-overlay reminder-popup" id="reminder-overlay" hidden>
+  <div class="modal" id="reminder-content"></div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
+
+// Valeurs par defaut des messages-type, utilisees tant que Marie n'a pas
+// enregistre ses propres versions via le bouton "Template" (onglet Prospects) --
+// stockees alors dans l'onglet "Objectifs" du Google Sheet, cf. messageTemplatesActuels().
+const DEFAULT_MESSAGE_TEMPLATES = {
+  "Nouveau": `Hello et bienvenue dans mon réseau 🌞
+
+Comme tu l'as peut-être constaté, j'aborde les relations amoureuses dans mes posts et aussi dans mes accompagnements.
+Mon histoire personnelle m'a sensibilisé à l'importance d'une bonne communication dans ce domaine et j'ai décidé d'en faire mon métier.
+
+Je serais curieuse de savoir ce qui t'a poussé à me suivre !
+Est-ce pour mon contenu ou par rapport à quelque chose que tu vis en ce moment ?
+
+Je te remercie et je te souhaite une belle journée.
+
+Au plaisir de te lire,
+Marie 🌞`,
+  "Première relance": `Bonjour {prenom},
+
+Petite relance pour savoir s'il y a une bonne manière de relancer ?
+Ou d'humaniser les échanges sur LinkedIn. 🤭
+
+Dans l'attente de ton retour, je te souhaite une belle journée.
+Marie`,
+  "Deuxième relance": `Hello {prenom},
+
+The last but not least 🙂
+Si tu as quelques minutes à m'accorder, ça me ferait plaisir d'en savoir un peu plus sur toi et sur ce qui t'a donné envie de me suivre ?
+
+Au plaisir de te lire, je te souhaite une belle fin de semaine.
+Marie`
+};
+
+const STATUT_OPTIONS = [
+  "Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation",
+  "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter"
+];
+const STATUT_CLASS = {
+  "Nouveau": "st-neutral",
+  "En attente de connexion": "st-connexion",
+  "Première relance": "st-r1",
+  "Deuxième relance": "st-r2",
+  "En conversation": "st-conversation",
+  "Appel découverte": "st-decouverte",
+  "En attente de paiement": "st-attente",
+  "Client": "st-client",
+  "Hors cible": "st-non",
+  "Pas maintenant": "st-non",
+  "Recontacter": "st-recontact"
+};
+const TEMP_OPTIONS = ["Froid", "Tiède", "Chaud"];
+const CANAL_OPTIONS = ["LinkedIn", "Instagram", "Bouche à oreille", "Autre"];
+const CANAL_LABELS = { "LinkedIn": "LK", "Instagram": "IG", "Bouche à oreille": "BàO", "Autre": "Autre" };
+function canalOptionsHtml(valeur) {
+  return CANAL_OPTIONS.map(o => `<option value="${o}" ${o === valeur ? "selected" : ""}>${CANAL_LABELS[o]}</option>`).join("");
+}
+function tempClass(valeur) {
+  const v = (valeur || "").toLowerCase();
+  if (v.indexOf("chaud") !== -1) return "t-chaud";
+  if (v.indexOf("tiede") !== -1 || v.indexOf("tiède") !== -1) return "t-tiede";
+  if (v.indexOf("froid") !== -1) return "t-froid";
+  return "t-vide";
+}
+function formuleClass(valeur) {
+  const v = (valeur || "").toLowerCase();
+  if (v.indexOf("sur-mesure") !== -1 || v.indexOf("sur mesure") !== -1) return "f-sur-mesure";
+  if (v.indexOf("miroir") !== -1) return "f-miroir";
+  if (v.indexOf("autonomie") !== -1) return "f-autonomie";
+  return "f-vide";
+}
+function frDateToIso(str) {
+  if (!str) return "";
+  const p = str.split("/");
+  if (p.length !== 3) return "";
+  return p[2] + "-" + p[1] + "-" + p[0];
+}
+function isoDateToFr(str) {
+  if (!str) return "";
+  const p = str.split("-");
+  if (p.length !== 3) return "";
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+// Champs "date" (input type=date, valeur brute ISO) -- necessaire pour convertir
+// en francais avant mise a jour optimiste de currentData (le reste de l'appli
+// attend systematiquement du JJ/MM/AAAA, jamais de l'ISO).
+const CHAMPS_DATE = ["dateAppelDecouverte", "dateRappel", "date1erMessage", "date", "finAccompagnement", "date1erVersement"];
+function coerceValeurLocale(champ, valeur) {
+  if (champ === "echecPaiement") return valeur === "true";
+  if (CHAMPS_DATE.indexOf(champ) !== -1) return isoDateToFr(valeur);
+  return valeur;
+}
+// Paiement : Montant total (existant) + Nombre de versements + Date du 1er versement.
+// Les echeances mensuelles sont recalculees a la volee (jamais stockees) --
+// dernier versement = reste exact, pour ne jamais perdre un centime a l'arrondi.
+function calculerEcheances(montantTotal, nb, date1erFr) {
+  const debut = parseFrDate(date1erFr);
+  if (!debut || !nb || nb < 1) return [];
+  const par = Math.round(montantTotal / nb);
+  const echeances = [];
+  let cumule = 0;
+  for (let i = 0; i < nb; i++) {
+    const d = new Date(debut.getFullYear(), debut.getMonth() + i, debut.getDate());
+    const montant = (i === nb - 1) ? (montantTotal - cumule) : par;
+    cumule += montant;
+    echeances.push({ date: d, montant: montant });
+  }
+  return echeances;
+}
+// Une echeance ne compte comme encaissee que si sa date est passee (ou aujourd'hui)
+// ET que la cliente n'est pas marquee "Echec de paiement" -- jamais de futur credite.
+function echeancesEncaissees(c) {
+  if (c.echecPaiement) return [];
+  const echeances = calculerEcheances(Number(c.montant) || 0, Number(c.nombreVersements) || 0, c.date1erVersement);
+  const t = today0();
+  return echeances.filter(e => e.date <= t);
+}
+function resteDu(c) {
+  const montantTotal = Number(c.montant) || 0;
+  const encaisse = echeancesEncaissees(c).reduce((s, e) => s + e.montant, 0);
+  return Math.max(0, montantTotal - encaisse);
+}
+const FORMULE_OPTIONS = ["Autonomie", "En miroir", "Sur-mesure"];
+const FORMULE_MONTANT_DEFAUT = { "Autonomie": 390, "En miroir": 890, "Sur-mesure": 2000 };
+function formuleOptionsHtml() {
+  return '<option value="">—</option>' + FORMULE_OPTIONS.map(o => `<option value="${o}">${o}</option>`).join("");
+}
+function onFormuleChange(selectEl, montantInputId) {
+  const defaut = FORMULE_MONTANT_DEFAUT[selectEl.value];
+  if (defaut) document.getElementById(montantInputId).value = defaut;
+}
+
+const PWD_KEY = "crmAimePwd";
+function getStoredPassword() { return localStorage.getItem(PWD_KEY) || ""; }
+function setStoredPassword(p) { localStorage.setItem(PWD_KEY, p); }
+function clearStoredPassword() { localStorage.removeItem(PWD_KEY); }
+
+let jsonpSeq = 0;
+function jsonpCall(params) {
+  return new Promise((resolve, reject) => {
+    const name = "crmCb" + (jsonpSeq++);
+    const script = document.createElement("script");
+    let done = false;
+    window[name] = (data) => { done = true; resolve(data); cleanup(); };
+    script.onerror = () => { if (!done) { reject(new Error("Erreur de chargement")); cleanup(); } };
+    function cleanup() { delete window[name]; script.remove(); }
+    const query = new URLSearchParams({ ...params, pwd: getStoredPassword(), callback: name }).toString();
+    script.src = APPS_SCRIPT_URL + "?" + query;
+    document.body.appendChild(script);
+    setTimeout(() => { if (!done) { reject(new Error("Delai depasse")); cleanup(); } }, 15000);
+  });
+}
+
+function parseFrDate(str) {
+  if (!str) return null;
+  const parts = str.split("/");
+  if (parts.length !== 3) return null;
+  const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function today0() { const t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+function isOverdue(dateStr) {
+  const d = parseFrDate(dateStr);
+  return d ? d <= today0() : false;
+}
+function nextRelance(p) {
+  const n = Number(p.nbRelances) || 0;
+  if (n === 0 && p.relance1) return p.relance1;
+  if (n === 1 && p.relance2) return p.relance2;
+  return null;
+}
+function escapeHtml(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+let currentData = null;
+let currentTab = "dashboard";
+let rechercheTexte = "";
+function normaliserTexte(s) {
+  return (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+function onRechercheInput(el) {
+  rechercheTexte = el.value;
+  const id = el.id;
+  const pos = el.selectionStart;
+  render(currentData);
+  const nouvelEl = document.getElementById(id);
+  if (nouvelEl) {
+    nouvelEl.focus();
+    try { nouvelEl.setSelectionRange(pos, pos); } catch (err) {}
+  }
+}
+
+function showLockScreen(errorMsg) {
+  document.getElementById("tabs").hidden = true;
+  document.getElementById("loading").hidden = true;
+  document.querySelectorAll(".tab-panel").forEach(p => p.hidden = true);
+  document.getElementById("lock-screen").hidden = false;
+  document.getElementById("lock-error").textContent = errorMsg || "";
+  document.getElementById("lock-error").style.display = errorMsg ? "block" : "none";
+  document.getElementById("lock-pwd").value = "";
+  document.getElementById("lock-pwd").focus();
+}
+
+async function submitPassword() {
+  const val = document.getElementById("lock-pwd").value;
+  setStoredPassword(val);
+  const btn = document.getElementById("lock-submit");
+  btn.disabled = true;
+  btn.textContent = "Vérification...";
+  let res;
+  try {
+    res = await jsonpCall({ action: "list" });
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "Entrer";
+    showLockScreen("Connexion impossible. Réessaie.");
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = "Entrer";
+  if (!res.ok) {
+    clearStoredPassword();
+    showLockScreen("Mot de passe incorrect.");
+    return;
+  }
+  currentData = res;
+  document.getElementById("lock-screen").hidden = true;
+  render(res);
+  maybeShowReminderPopup(res);
+}
+
+async function loadData(skipPopup) {
+  if (!getStoredPassword()) { showLockScreen(); return; }
+  try {
+    currentData = await jsonpCall({ action: "list" });
+  } catch (e) {
+    document.getElementById("loading").textContent = "Impossible de charger les donnees. Recharge la page.";
+    document.getElementById("loading").hidden = false;
+    return;
+  }
+  if (!currentData.ok) {
+    clearStoredPassword();
+    showLockScreen("Session expirée, retape le mot de passe.");
+    return;
+  }
+  render(currentData);
+  if (!skipPopup) maybeShowReminderPopup(currentData);
+}
+
+function render(data) {
+  document.getElementById("banner-date").textContent = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  document.getElementById("loading").hidden = true;
+  document.getElementById("tabs").hidden = false;
+
+  document.getElementById("tab-dashboard").innerHTML = renderDashboard(data);
+  document.getElementById("tab-prospects").innerHTML = renderProspectsSection(data.prospects);
+  document.getElementById("tab-clients").innerHTML = renderClientsSection(data.clients);
+
+  document.querySelectorAll(".tab-panel").forEach(p => p.hidden = (p.id !== "tab-" + currentTab));
+}
+
+// ─── Onglet Tableau de bord ───
+
+function periodeRange(periode) {
+  const n = new Date();
+  if (periode === "semaine") {
+    const jour = n.getDay(); // 0 = dimanche
+    const diffLundi = jour === 0 ? -6 : 1 - jour;
+    return { debut: new Date(n.getFullYear(), n.getMonth(), n.getDate() + diffLundi) };
+  }
+  if (periode === "mois") return { debut: new Date(n.getFullYear(), n.getMonth(), 1) };
+  if (periode === "trimestre") return { debut: new Date(n.getFullYear(), Math.floor(n.getMonth() / 3) * 3, 1) };
+  return { debut: new Date(n.getFullYear(), 0, 1) };
+}
+function periodeFin(periode) {
+  const n = new Date();
+  if (periode === "semaine") {
+    const debut = periodeRange("semaine").debut;
+    return new Date(debut.getFullYear(), debut.getMonth(), debut.getDate() + 6);
+  }
+  if (periode === "mois") return new Date(n.getFullYear(), n.getMonth() + 1, 0);
+  if (periode === "trimestre") { const qDebut = Math.floor(n.getMonth() / 3) * 3; return new Date(n.getFullYear(), qDebut + 3, 0); }
+  return new Date(n.getFullYear(), 11, 31);
+}
+function sommeCaPeriode(clients, periode) {
+  const debut = periodeRange(periode).debut;
+  return clients.reduce((s, c) => s + echeancesEncaissees(c).filter(e => e.date >= debut).reduce((s2, e) => s2 + e.montant, 0), 0);
+}
+function panierMoyenReel(clients) {
+  const payantes = clients.filter(c => echeancesEncaissees(c).length > 0);
+  if (!payantes.length) return 0;
+  return payantes.reduce((s, c) => s + (Number(c.montant) || 0), 0) / payantes.length;
+}
+function periodeKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+function moisLabel(d) {
+  const noms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+  return noms[d.getMonth()] + " " + d.getFullYear();
+}
+function trimestreLabel(d) {
+  return "T" + (Math.floor(d.getMonth() / 3) + 1) + " " + d.getFullYear();
+}
+function objectifBrutMoisPour(dateRef, obj) {
+  const net = dateRef.getFullYear() >= 2027 ? (obj.netVise2027 || 0) : (obj.netVise2026 || 0);
+  return net > 0 ? Math.round(net / (1 - 0.246)) : 0;
+}
+function moisDansPeriode(dateRef, periode) {
+  const y = dateRef.getFullYear(), m = dateRef.getMonth();
+  if (periode === "trimestre") { const qDebut = Math.floor(m / 3) * 3; return [0, 1, 2].map(i => new Date(y, qDebut + i, 1)); }
+  if (periode === "annee") return Array.from({ length: 12 }, (_, i) => new Date(y, i, 1));
+  return [new Date(y, m, 1)];
+}
+function objectifBrutPeriode(dateRef, periode, obj) {
+  return moisDansPeriode(dateRef, periode).reduce((s, d) => s + objectifBrutMoisPour(d, obj), 0);
+}
+// Marge no-show : calculee sur les 3 derniers mois glissants de l'onglet HistoriqueAppels
+// (pas sur la moyenne historique complete, qui inclurait la periode de demarrage moins representative).
+function moisTri(h) {
+  const d = parseFrDate(h.mois);
+  return d ? d.getTime() : 0;
+}
+function noShowRateGlissant(historique) {
+  const tries = (historique || []).filter(h => h.mois).slice().sort((a, b) => moisTri(a) - moisTri(b));
+  const derniers3 = tries.slice(-3);
+  const totalAppels = derniers3.reduce((s, h) => s + (Number(h.appelsTenus) || 0), 0);
+  const totalNoShow = derniers3.reduce((s, h) => s + (Number(h.noShows) || 0), 0);
+  if (totalAppels <= 0) return 0;
+  return totalNoShow / totalAppels;
+}
+function planAppelsMois(dateRef, data, obj) {
+  const cle = periodeKey(dateRef);
+  const encaisse = (data.clients || []).reduce((s, c) => s + echeancesEncaissees(c).filter(e => periodeKey(e.date) === cle).reduce((s2, e) => s2 + e.montant, 0), 0);
+  const objectifBrut = objectifBrutMoisPour(dateRef, obj);
+  const ecart = Math.max(0, objectifBrut - encaisse);
+  const panier = panierMoyenReel(data.clients);
+  const tauxConv = (obj.tauxConversion || 27) / 100;
+  const clientsNecessaires = panier > 0 ? Math.ceil(ecart / panier) : 0;
+  const appelsNecessaires = tauxConv > 0 ? Math.ceil(clientsNecessaires / tauxConv) : 0;
+  const noShowRate = noShowRateGlissant(data.historiqueAppels);
+  const appelsABooker = noShowRate < 1 ? Math.ceil(appelsNecessaires / (1 - noShowRate)) : appelsNecessaires;
+  return { objectifBrut, encaisse, ecart, clientsNecessaires, appelsNecessaires, appelsABooker, noShowRate };
+}
+// ─── Alertes fiscales / rappels ───
+
+const SEUIL_MICRO_BNC_2026 = 77700;
+function alerteSeuilMicroBncHtml(caAnneeReel) {
+  const pct = SEUIL_MICRO_BNC_2026 > 0 ? (caAnneeReel / SEUIL_MICRO_BNC_2026) * 100 : 0;
+  if (pct < 80) return "";
+  const rouge = pct >= 95;
+  const style = rouge ? "background:rgba(139,26,26,0.10);border-color:var(--bordeaux);" : "background:rgba(184,130,74,0.14);border-color:#b8824a;";
+  return `
+    <div class="alerte-seuil" style="${style}">
+      <b>${Math.round(pct)}% du plafond micro-BNC 2026</b> (${Math.round(caAnneeReel).toLocaleString("fr-FR")}€ / ${SEUIL_MICRO_BNC_2026.toLocaleString("fr-FR")}€)
+      — ${rouge ? "seuil presque atteint, anticipe un dépassement de régime." : "à surveiller d'ici la fin de l'année."}
+    </div>
+  `;
+}
+
+function rappelVersementLiberatoireHtml() {
+  const n = new Date();
+  const debut = new Date(n.getFullYear(), 8, 1);
+  const fin = new Date(n.getFullYear(), 9, 1);
+  if (n < debut || n >= fin) return "";
+  return `
+    <div class="alerte-seuil" style="background:rgba(184,130,74,0.14);border-color:#b8824a;">
+      <b>Rappel annuel</b> — vérifie ton éligibilité au versement libératoire de l'impôt sur le revenu avant la deadline du <b>1er octobre</b>.
+    </div>
+  `;
+}
+
+const DEFAULT_TEMPLATE_RAPPEL = "Bonjour {prenom}, petit rappel : notre appel découverte approche ! Au plaisir de te rencontrer très bientôt 😊";
+// Les 4 templates (3 messages de prospection + rappel appel decouverte) sont
+// stockes dans l'onglet "Objectifs" du Sheet, modifiables via le bouton
+// "Template" (onglet Prospects). Tant qu'un champ est vide dans le Sheet, on
+// retombe sur sa valeur par defaut ci-dessus -- jamais de message vide envoye.
+function messageTemplatesActuels() {
+  const obj = (currentData && currentData.objectifs) || {};
+  return {
+    "Nouveau": obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"],
+    "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
+    "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"]
+  };
+}
+function rappelsADemainHtml(prospects, obj) {
+  const aujourdhui = today0();
+  const matches = prospects
+    .filter(p => {
+      const d = parseFrDate(p.dateAppelDecouverte);
+      if (!d) return false;
+      const diff = Math.round((d - aujourdhui) / 86400000);
+      return diff === 1 || diff === 2;
+    })
+    .sort((a, b) => parseFrDate(a.dateAppelDecouverte) - parseFrDate(b.dateAppelDecouverte));
+  if (!matches.length) return `<p class="muted">Aucun appel découverte dans les 24-48h à venir.</p>`;
+  const rows = matches.map(p => `
+    <div class="rappel-item">
+      <span><b>${escapeHtml(p.nom)}</b> — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
+      <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
+    </div>
+  `).join("");
+  return `<div class="rappels-list">${rows}</div>`;
+}
+// Simple aperçu (pas d'action ici) -- Marie traite les relances depuis
+// l'onglet Prospects, ou le lien profil et le tri sont deja sous les yeux.
+function relancesADemainHtml(prospects) {
+  const matches = prospects.filter(p => {
+    const r = nextRelance(p);
+    return r && isOverdue(r);
+  });
+  if (!matches.length) return `<p class="muted">Aucune relance en retard.</p>`;
+  const premiere = matches.filter(p => (Number(p.nbRelances) || 0) === 0);
+  const deuxieme = matches.filter(p => (Number(p.nbRelances) || 0) === 1);
+  const ligneRelance = (label, liste) => liste.length
+    ? `<div>• ${label} : ${liste.map(p => escapeHtml(p.nom)).join(", ")}.</div>`
+    : "";
+  return `<div class="rappel-item rappel-item--block">
+    <div><b>${matches.length} relance${matches.length > 1 ? "s" : ""} aujourd'hui</b></div>
+    ${ligneRelance("Première relance", premiere)}
+    ${ligneRelance("Deuxième relance", deuxieme)}
+  </div>`;
+}
+// Fait avancer Nb relances ET Statut ensemble (Nouveau -> Premiere relance ->
+// Deuxieme relance), pour que les deux restent toujours synchronises. Avant ce
+// fix, seul Nb relances avancait -- si le meme prospect etait marque "Relance
+// envoyee" une seconde fois (depuis le dashboard puis depuis Prospects, par
+// exemple) sans que le Statut ait bouge entre-temps, Nb relances pouvait
+// sauter de 0 a 2 d'un coup, ce qui videt "Prochaine action" (non gere au-dela
+// de 1) sans que le Statut ne l'ait jamais reflete.
+async function marquerRelanceEnvoyee(ligne) {
+  const p = currentData.prospects.find(x => x.ligne === ligne);
+  if (!p) return;
+  const n = Number(p.nbRelances) || 0;
+  if (n >= 2) return;
+  const nouveauStatut = n === 0 ? "Première relance" : "Deuxième relance";
+  await updateField(ligne, "nbRelances", String(n + 1));
+  await updateField(ligne, "statut", nouveauStatut);
+}
+function copierRappel(nom) {
+  const prenom = (nom || "").split(" ")[0];
+  const template = (currentData && currentData.objectifs && currentData.objectifs.templateRappel) || DEFAULT_TEMPLATE_RAPPEL;
+  const texte = template.replace("{prenom}", prenom);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texte).catch(() => prompt("Copie ce message :", texte));
+  } else {
+    prompt("Copie ce message :", texte);
+  }
+}
+
+function compteAppelsDecouvertePeriode(prospects, clients, periode) {
+  const debut = periodeRange(periode).debut;
+  const nProspects = prospects.filter(p => { const d = parseFrDate(p.dateAppelDecouverte); return d && d >= debut; }).length;
+  const nClients = clients.filter(c => { const d = parseFrDate(c.dateAppelDecouverte); return d && d >= debut; }).length;
+  return nProspects + nClients;
+}
+
+function objectifTint(reel, objectif, periode) {
+  if (objectif <= 0) return "";
+  const pct = Math.min(100, Math.round((reel / objectif) * 100));
+  if (reel >= objectif) return "rgba(21,128,61,0.08)"; // vert : objectif atteint
+  const joursRestants = Math.ceil((periodeFin(periode) - today0()) / 86400000);
+  if (joursRestants <= 5) return "rgba(139,26,26,0.09)"; // rouge : bientot fini, pas atteint
+  if (pct >= 70) return "rgba(184,130,74,0.12)"; // jaune : presque
+  return "";
+}
+
+function objectifCardHtml(label, reel, objectif, unite, periode) {
+  const reste = Math.max(0, objectif - reel);
+  const atteint = objectif > 0 && reste === 0;
+  const pct = objectif > 0 ? Math.min(100, Math.round((reel / objectif) * 100)) : 0;
+  const fmt = (n) => unite === "€" ? n.toLocaleString("fr-FR") + "€" : n;
+  const tint = objectifTint(reel, objectif, periode);
+  const cardStyle = tint ? ` style="background:${tint};"` : "";
+
+  return `
+    <div class="objectif-card objectif-card--compact"${cardStyle}>
+      <div class="objectif-card__label">${label}</div>
+      <div class="objectif-card__row"><span>Réalisé</span><span class="valeur">${fmt(reel)}</span></div>
+      <div class="objectif-card__row"><span>Objectif</span><span>${fmt(objectif)}</span></div>
+      <div class="objectif-card__row"><span>Reste à faire</span><span class="${atteint ? "objectif-card__reste--atteint" : "objectif-card__reste"}">${atteint ? "Objectif atteint ✓" : fmt(reste)}</span></div>
+      <div class="objectif-progress"><div class="objectif-progress__fill" style="width:${pct}%"></div></div>
+    </div>
+  `;
+}
+
+function objectifCardFeatured(label, reel, objectif, unite, periode, note) {
+  const reste = Math.max(0, objectif - reel);
+  const atteint = objectif > 0 && reste === 0;
+  const pct = objectif > 0 ? Math.min(100, Math.round((reel / objectif) * 100)) : 0;
+  const fmt = (n) => unite === "€" ? n.toLocaleString("fr-FR") + "€" : n;
+  const tint = objectifTint(reel, objectif, periode);
+  const cardStyle = tint ? ` style="background:${tint};"` : "";
+
+  return `
+    <div class="objectif-card objectif-card--featured"${cardStyle}>
+      <div class="objectif-card__label">${label}</div>
+      <div class="objectif-featured__main">
+        <div class="objectif-featured__pct">${pct}%</div>
+        <div class="objectif-featured__detail">
+          <div class="objectif-card__row"><span>Réalisé</span><span class="valeur">${fmt(reel)}</span></div>
+          <div class="objectif-card__row"><span>Objectif</span><span>${fmt(objectif)}</span></div>
+          <div class="objectif-card__row"><span>Reste à faire</span><span class="${atteint ? "objectif-card__reste--atteint" : "objectif-card__reste"}">${atteint ? "Objectif atteint ✓" : fmt(reste)}</span></div>
+        </div>
+      </div>
+      <div class="objectif-progress objectif-progress--big"><div class="objectif-progress__fill" style="width:${pct}%"></div></div>
+      ${note ? `<p class="objectif-featured__note">${note}</p>` : ""}
+    </div>
+  `;
+}
+
+function historiquePeriodes(clients, type, nb) {
+  const n = new Date();
+  const items = [];
+  for (let i = nb - 1; i >= 0; i--) {
+    let debut, fin, label;
+    if (type === "mois") {
+      debut = new Date(n.getFullYear(), n.getMonth() - i, 1);
+      fin = new Date(debut.getFullYear(), debut.getMonth() + 1, 0);
+      label = debut.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+    } else if (type === "trimestre") {
+      const qActuel = Math.floor(n.getMonth() / 3);
+      const totalQ = n.getFullYear() * 4 + qActuel - i;
+      const annee = Math.floor(totalQ / 4);
+      const q = ((totalQ % 4) + 4) % 4;
+      debut = new Date(annee, q * 3, 1);
+      fin = new Date(annee, q * 3 + 3, 0);
+      label = `T${q + 1} ${String(annee).slice(2)}`;
+    } else {
+      const annee = n.getFullYear() - i;
+      debut = new Date(annee, 0, 1);
+      fin = new Date(annee, 11, 31);
+      label = String(annee);
+    }
+    const total = clients.reduce((s, c) => s + echeancesEncaissees(c).reduce((s2, e) => {
+      return (e.date >= debut && e.date <= fin) ? s2 + e.montant : s2;
+    }, 0), 0);
+    items.push({ label, total });
+  }
+  return items;
+}
+
+function historiqueBarsHtml(items, compact) {
+  const max = Math.max(1, ...items.map(i => i.total));
+  const rowClass = compact ? "historique-row historique-row--compact" : "historique-row";
+  const trackClass = compact ? "historique-bar__track historique-bar__track--compact" : "historique-bar__track";
+  return `
+    <div class="${rowClass}">
+      ${items.map(i => `
+        <div class="historique-bar">
+          <div class="historique-bar__value">${i.total.toLocaleString("fr-FR")}€</div>
+          <div class="${trackClass}"><div class="historique-bar__fill" style="height:${Math.max(2, Math.round((i.total / max) * 100))}%"></div></div>
+          <div class="historique-bar__label">${i.label}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function profilCibleHtml(clients) {
+  const metiers = {};
+  const ages = [];
+  clients.forEach(c => {
+    if (c.metier) { const m = c.metier.trim(); metiers[m] = (metiers[m] || 0) + 1; }
+    if (c.age && !isNaN(Number(c.age))) ages.push(Number(c.age));
+  });
+  const topMetiers = Object.entries(metiers).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const ageMoyen = ages.length ? Math.round(ages.reduce((s, a) => s + a, 0) / ages.length) : null;
+
+  if (topMetiers.length === 0 && ageMoyen === null) {
+    return `
+      <div class="profil-cible">
+        <div class="profil-cible__eyebrow">Profil cible</div>
+        <p class="muted">Renseigne le métier et l'âge de tes clientes (colonnes de l'onglet Clients) pour voir apparaître ici le profil type de tes clientes actuelles.</p>
+      </div>
+    `;
+  }
+  const chips = topMetiers.map(([m, n]) => `<span class="profil-cible__chip"><b>${n}</b> ${escapeHtml(m)}</span>`).join("");
+  const ageChip = ageMoyen !== null ? `<span class="profil-cible__chip">Âge moyen : <b>${ageMoyen} ans</b></span>` : "";
+  return `
+    <div class="profil-cible">
+      <div class="profil-cible__eyebrow">Profil cible — d'après tes clientes actuelles</div>
+      <div class="profil-cible__list">${chips}${ageChip}</div>
+    </div>
+  `;
+}
+
+function historiqueAppelsHtml(historique) {
+  const rows = (historique || []).filter(h => h.mois).slice().sort((a, b) => moisTri(a) - moisTri(b));
+  if (!rows.length) {
+    return `<p class="muted">Aucun historique pour le moment — ajoute des lignes dans l'onglet "HistoriqueAppels" du Google Sheet (mois, appels tenus, signatures, no-show).</p>`;
+  }
+  const lignes = rows.map(h => {
+    const appels = Number(h.appelsTenus) || 0;
+    const sig = Number(h.signatures) || 0;
+    const noShow = Number(h.noShows) || 0;
+    const taux = appels > 0 ? Math.round((sig / appels) * 100) : null;
+    const faible = appels > 0 && appels < 3;
+    const d = parseFrDate(h.mois);
+    const label = d ? moisLabel(d) : escapeHtml(String(h.mois));
+    return `
+      <tr${faible ? ' style="background:rgba(139,26,26,0.06);"' : ""}>
+        <td>${label}</td>
+        <td>${appels}</td>
+        <td>${sig}</td>
+        <td>${taux === null ? "—" : taux + "%"}</td>
+        <td>${noShow}</td>
+        <td>${faible ? "Rythme interrompu — taux non fiable ce mois" : ""}</td>
+      </tr>
+    `;
+  }).join("");
+  const legende = rows.some(h => (Number(h.appelsTenus) || 0) > 0 && (Number(h.appelsTenus) || 0) < 3)
+    ? `<p class="muted" style="margin-bottom:0.5rem;"><span style="display:inline-block;width:9px;height:9px;background:rgba(139,26,26,0.35);margin-right:6px;vertical-align:middle;"></span>Ligne surlignée = moins de 3 appels tenus ce mois-là, taux de conversion pas fiable.</p>`
+    : "";
+  return `
+    ${legende}
+    <div class="table-wrap">
+      <table class="table-compact" style="max-width:640px;">
+        <thead><tr><th>Mois</th><th>Appels tenus</th><th>Signatures</th><th>Taux de conversion</th><th>No-show</th><th>Note</th></tr></thead>
+        <tbody>${lignes}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function roadmapObjectifsHtml(data, obj) {
+  const debut = new Date(); debut.setDate(1);
+  const fin = new Date(2027, 11, 1);
+  const mois = [];
+  let cur = new Date(debut);
+  while (cur <= fin) { mois.push(new Date(cur)); cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1); }
+  const lignes = mois.map(d => {
+    const plan = planAppelsMois(d, data, obj);
+    const net = d.getFullYear() >= 2027 ? (obj.netVise2027 || 0) : (obj.netVise2026 || 0);
+    return `
+      <tr>
+        <td>${moisLabel(d)}</td>
+        <td>${net.toLocaleString("fr-FR")}€</td>
+        <td>${plan.objectifBrut.toLocaleString("fr-FR")}€</td>
+        <td>${plan.encaisse.toLocaleString("fr-FR")}€</td>
+        <td>${plan.ecart.toLocaleString("fr-FR")}€</td>
+        <td>${plan.clientsNecessaires}</td>
+        <td>${plan.appelsABooker}</td>
+      </tr>
+    `;
+  }).join("");
+  return `
+    <div class="table-wrap">
+      <table class="table-compact">
+        <thead><tr><th>Mois</th><th>Net visé</th><th>CA brut objectif</th><th>CA encaissé</th><th>Écart</th><th>Clientes nécessaires</th><th>Appels à booker</th></tr></thead>
+        <tbody>${lignes}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderDashboard(data) {
+  const s = data.stats;
+  const obj = data.objectifs || {};
+  const maintenant = new Date();
+  const plan = planAppelsMois(maintenant, data, obj);
+  const netCeMois = maintenant.getFullYear() >= 2027 ? (obj.netVise2027 || 0) : (obj.netVise2026 || 0);
+
+  const caMois = objectifCardFeatured("CA — " + moisLabel(maintenant), plan.encaisse, plan.objectifBrut, "€", "mois",
+    netCeMois > 0 ? `Dérivé du net visé (${netCeMois.toLocaleString("fr-FR")}€ net, URSSAF 24,6%).` : "Règle un net visé mensuel pour voir l'objectif brut.");
+  const caTrimestre = objectifCardHtml("Ce trimestre (" + trimestreLabel(maintenant) + ")", sommeCaPeriode(data.clients, "trimestre"), objectifBrutPeriode(maintenant, "trimestre", obj), "€", "trimestre");
+  const caAnnee = objectifCardHtml("Cette année (" + maintenant.getFullYear() + ")", sommeCaPeriode(data.clients, "annee"), objectifBrutPeriode(maintenant, "annee", obj), "€", "annee");
+
+  const reelSemaine = compteAppelsDecouvertePeriode(data.prospects, data.clients, "semaine");
+  const rythmeSemaine = plan.appelsABooker > 0 ? Math.round(plan.appelsABooker / 4.33) : 0;
+  const noShowPct = Math.round(plan.noShowRate * 100);
+  const noteProsp = plan.appelsABooker > 0
+    ? `${plan.clientsNecessaires} cliente${plan.clientsNecessaires > 1 ? "s" : ""} encore nécessaire${plan.clientsNecessaires > 1 ? "s" : ""} pour boucler le mois → ~${plan.appelsABooker} appel${plan.appelsABooker > 1 ? "s" : ""} à booker (marge no-show ${noShowPct}% incluse, calculée sur les 3 derniers mois) — soit ~${rythmeSemaine}/semaine. Cette semaine : ${reelSemaine}.`
+    : "Objectif du mois déjà atteint, ou panier moyen pas encore calculable (ajoute une date de paiement à au moins une cliente).";
+  const prospMois = objectifCardFeatured("Appels découverte — " + moisLabel(maintenant), compteAppelsDecouvertePeriode(data.prospects, data.clients, "mois"), plan.appelsABooker, "", "mois", noteProsp);
+
+  return `
+    <div class="stats">
+      <div class="stat"><div class="stat__value">${s.totalContacts}</div><div class="stat__label">Contacts totaux</div></div>
+      <div class="stat"><div class="stat__value">${s.totalProspects}</div><div class="stat__label">Prospects à contacter</div></div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${s.totalClients}</div><div class="stat__label">Clientes</div></div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--success">${s.tauxConversion}%</div><div class="stat__label">Taux de conversion</div></div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--success">${s.caGenere.toLocaleString("fr-FR")}€</div><div class="stat__label">CA généré</div></div>
+    </div>
+
+    ${rappelVersementLiberatoireHtml()}
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Relances à envoyer aujourd'hui</span></div>
+      <p class="muted" style="margin-bottom:0.75rem;">Prospects dont la Relance 1 ou 2 est dépassée (colonne "Prochaine action" côté Prospects).</p>
+      ${relancesADemainHtml(data.prospects)}
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Rappels à envoyer aujourd'hui</span></div>
+      <p class="muted" style="margin-bottom:0.75rem;">Appels découverte prévus dans les 24-48h (colonne "Appel découverte" côté Prospects).</p>
+      ${rappelsADemainHtml(data.prospects, obj)}
+    </div>
+
+    <div class="section">
+      <div class="section__head">
+        <span class="section__eyebrow">Objectifs</span>
+        <button class="btn btn--ghost" onclick="toggleObjectifsForm()">Régler mes objectifs</button>
+      </div>
+      <p class="muted" style="margin-bottom:0.75rem;">Chiffre d'affaires</p>
+      <div class="objectifs-grid" style="grid-template-columns:1.6fr 1fr 1fr;">${caMois}${caTrimestre}${caAnnee}</div>
+      ${alerteSeuilMicroBncHtml(sommeCaPeriode(data.clients, "annee"))}
+      <p class="muted" style="margin:1.5rem 0 0.75rem;">Appels découverte</p>
+      <div class="objectifs-grid" style="grid-template-columns:1fr;max-width:60%;">${prospMois}</div>
+      <div class="objectifs-form" id="objectifs-form" hidden>
+        <div class="objectifs-form__grid">
+          <div><label>Net visé par mois — 2026</label><input id="obj-net-2026" type="number" value="${obj.netVise2026 || 0}"></div>
+          <div><label>Net visé par mois — 2027</label><input id="obj-net-2027" type="number" value="${obj.netVise2027 || 0}"></div>
+          <div><label>Taux de conversion appel → client (%)</label><input id="obj-taux-conversion" type="number" value="${obj.tauxConversion || 27}"></div>
+        </div>
+        <p class="muted" style="margin:0.75rem 0 1rem;">Le CA brut objectif (mois/trimestre/année) et le nombre d'appels à booker se recalculent automatiquement à partir de ces valeurs, du panier moyen réel et du taux de no-show glissant sur les 3 derniers mois (onglet "HistoriqueAppels").</p>
+        <div class="modal-actions" style="margin-top:0;">
+          <button class="btn btn--ghost" onclick="toggleObjectifsForm()">Annuler</button>
+          <button class="btn" id="obj-submit-btn" onclick="submitObjectifs()">Enregistrer mes objectifs</button>
+        </div>
+        <p class="lock-error" id="obj-error" style="text-align:left;"></p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Historique appels & conversion</span></div>
+      <div class="historique-side-by-side">
+        <div class="historique-side-by-side__main">
+          <p class="muted" style="margin-bottom:0.75rem;">Tenu à jour manuellement, onglet "HistoriqueAppels" du Google Sheet — une ligne par mois.</p>
+          ${historiqueAppelsHtml(data.historiqueAppels)}
+        </div>
+        <div class="historique-side-by-side__aside">
+          ${profilCibleHtml(data.clients)}
+          <p class="muted" style="margin:1.1rem 0 0.5rem;">CA par mois (6 derniers)</p>
+          ${historiqueBarsHtml(historiquePeriodes(data.clients, "mois", 6), true)}
+          <p class="muted" style="margin:1rem 0 0.5rem;">CA par trimestre (4 derniers)</p>
+          ${historiqueBarsHtml(historiquePeriodes(data.clients, "trimestre", 4), true)}
+          <p class="muted" style="margin:1rem 0 0.5rem;">CA par année</p>
+          ${historiqueBarsHtml(historiquePeriodes(data.clients, "annee", 3), true)}
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Feuille de route — objectifs mensuels</span></div>
+      <p class="muted" style="margin-bottom:0.75rem;">Du mois en cours à décembre 2027, recalculé à chaque vente encaissée.</p>
+      ${roadmapObjectifsHtml(data, obj)}
+    </div>
+  `;
+}
+
+function toggleObjectifsForm() {
+  const el = document.getElementById("objectifs-form");
+  el.hidden = !el.hidden;
+  if (!el.hidden) {
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const premierChamp = document.getElementById("obj-net-2026");
+    if (premierChamp) premierChamp.focus();
+  }
+}
+async function submitObjectifs() {
+  const btn = document.getElementById("obj-submit-btn");
+  const errorEl = document.getElementById("obj-error");
+  errorEl.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "Enregistrement...";
+  let res;
+  try {
+    res = await jsonpCall({
+      action: "setObjectifs",
+      netVise2026: document.getElementById("obj-net-2026").value,
+      netVise2027: document.getElementById("obj-net-2027").value,
+      tauxConversion: document.getElementById("obj-taux-conversion").value
+    });
+  } catch (e) {
+    res = null;
+  }
+  btn.disabled = false;
+  btn.textContent = "Enregistrer mes objectifs";
+  if (!res || !res.ok) {
+    errorEl.textContent = "Échec : " + (res && res.erreur ? res.erreur : "connexion impossible") + ". As-tu bien créé l'onglet \"Objectifs\" dans ton Google Sheet (voir les instructions) ?";
+    errorEl.style.display = "block";
+    return;
+  }
+  loadData(true);
+}
+
+// ─── Onglet Prospects ───
+
+const RELANCE_STATUTS = ["Nouveau", "Première relance"];
+let afficherNouveau = false;
+let afficherHorsCible = false;
+let filtreStatut = "";
+const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant"];
+const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
+// Hierarchie d'attention par defaut (sans clic sur "trier") : ce que Marie doit
+// voir tous les jours remonte, ce qui ne demande pas d'action reste discret en
+// bas. Distincte de STATUT_ORDER (l'ordre du pipeline, utilise seulement quand
+// elle clique explicitement sur l'en-tete "Statut").
+// "Hors cible" et "Pas maintenant" sont geres a part (toujours relegues en bas,
+// voir renderProspectsSection) -- pas besoin d'eux ici.
+const STATUT_PRIORITE = [
+  "Appel découverte", "En attente de paiement",
+  "Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Client"
+];
+
+let prospectSort = null; // { champ: 'statut' | 'temperature', dir: 1 | -1 }
+
+function sortProspects(list) {
+  const copie = list.slice();
+  if (!prospectSort) {
+    copie.sort((a, b) => {
+      const ia = STATUT_PRIORITE.indexOf(a.statut || "");
+      const ib = STATUT_PRIORITE.indexOf(b.statut || "");
+      const va = ia === -1 ? STATUT_PRIORITE.length : ia;
+      const vb = ib === -1 ? STATUT_PRIORITE.length : ib;
+      return va - vb;
+    });
+    return copie;
+  }
+  const order = prospectSort.champ === "statut" ? STATUT_ORDER : TEMP_ORDER;
+  copie.sort((a, b) => {
+    const ia = order.indexOf(a[prospectSort.champ] || "");
+    const ib = order.indexOf(b[prospectSort.champ] || "");
+    const va = ia === -1 ? order.length : ia;
+    const vb = ib === -1 ? order.length : ib;
+    return (va - vb) * prospectSort.dir;
+  });
+  return copie;
+}
+
+function toggleSort(champ) {
+  if (prospectSort && prospectSort.champ === champ) {
+    prospectSort = { champ, dir: prospectSort.dir * -1 };
+  } else {
+    prospectSort = { champ, dir: 1 };
+  }
+  render(currentData);
+}
+
+function toggleAfficherNouveau() {
+  afficherNouveau = !afficherNouveau;
+  render(currentData);
+}
+function toggleAfficherHorsCible() {
+  afficherHorsCible = !afficherHorsCible;
+  render(currentData);
+}
+function onFiltreStatutChange(select) {
+  filtreStatut = select.value;
+  render(currentData);
+}
+
+function copierMessage(nom, statut) {
+  const prenom = (nom || "").split(" ")[0];
+  const templates = messageTemplatesActuels();
+  const template = templates[statut] || templates["Nouveau"];
+  const texte = template.replace("{prenom}", prenom);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texte).catch(() => prompt("Copie ce message :", texte));
+  } else {
+    prompt("Copie ce message :", texte);
+  }
+}
+
+function renderProspectsSection(prospects) {
+  const rechercheActive = rechercheTexte.trim() !== "";
+  const rechercheNorm = normaliserTexte(rechercheTexte);
+  const nbNouveau = prospects.filter(p => p.statut === "Nouveau").length;
+  const nbHorsCible = prospects.filter(p => p.statut === "Hors cible").length;
+  // Une recherche active ignore les bascules Nouveau/Hors cible : l'objectif est de
+  // verifier si quelqu'un est deja connu quelque part dans le CRM, pas de parcourir.
+  const visibles = rechercheActive
+    ? prospects.filter(p => normaliserTexte(p.nom).indexOf(rechercheNorm) !== -1)
+    : filtreStatut
+      ? prospects.filter(p => p.statut === filtreStatut)
+      : prospects.filter(p => {
+        if (p.statut === "Nouveau" && !afficherNouveau) return false;
+        if (p.statut === "Hors cible" && !afficherHorsCible) return false;
+        return true;
+      });
+  // "Pas maintenant" et "Hors cible" restent visibles (si la bascule Hors
+  // cible est activee) mais toujours relegues en bas du tableau, quel que
+  // soit le tri actif sur le reste des lignes -- Hors cible encore plus bas
+  // que Pas maintenant, car c'est ce dont Marie a le moins besoin au quotidien
+  // (le menage se fait via le rappel RGPD annuel, pas ici). A l'inverse, une
+  // relance en retard remonte toujours en tete, avant le tri actif.
+  const pasMaintenant = visibles.filter(p => p.statut === "Pas maintenant");
+  const horsCible = visibles.filter(p => p.statut === "Hors cible");
+  const normales = visibles.filter(p => p.statut !== "Pas maintenant" && p.statut !== "Hors cible");
+  const relancesEnRetard = normales.filter(p => { const r = nextRelance(p); return r && isOverdue(r); });
+  const autresNormales = normales.filter(p => { const r = nextRelance(p); return !(r && isOverdue(r)); });
+  // Priorite par date de relance (la plus en retard en premier) -- toujours,
+  // meme si un tri par colonne (Statut/Temperature) est actif : ce groupe
+  // existe justement pour repondre a l'urgence chronologique, pas au pipeline.
+  relancesEnRetard.sort((a, b) => parseFrDate(nextRelance(a)) - parseFrDate(nextRelance(b)));
+  const lignesOrdonnees = [...relancesEnRetard, ...sortProspects(autresNormales), ...pasMaintenant, ...horsCible];
+
+  const btnNouveau = nbNouveau > 0
+    ? `<button class="btn btn--ghost" onclick="toggleAfficherNouveau()">${afficherNouveau ? "Masquer" : "Afficher"} Nouveau (${nbNouveau})</button>`
+    : "";
+  const btnHorsCible = nbHorsCible > 0
+    ? `<button class="btn btn--ghost" onclick="toggleAfficherHorsCible()">${afficherHorsCible ? "Masquer" : "Afficher"} Hors cible (${nbHorsCible})</button>`
+    : "";
+
+  return `
+    <div class="section">
+      <div class="section__head">
+        <span class="section__eyebrow">Prospects</span>
+        <div style="display:flex;gap:0.75rem;align-items:center;">
+          <input type="search" id="recherche-prospects" class="recherche-input" placeholder="Rechercher un nom…" value="${escapeHtml(rechercheTexte)}" oninput="onRechercheInput(this)">
+          <select class="note-input" style="max-width:200px;" onchange="onFiltreStatutChange(this)">
+            <option value="">Tous les statuts</option>
+            ${STATUT_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === filtreStatut ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}
+          </select>
+          ${btnNouveau}${btnHorsCible}
+          <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
+          <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
+        </div>
+      </div>
+      ${renderProspectsTable(lignesOrdonnees)}
+    </div>
+  `;
+}
+
+function renderProspectsTable(prospects) {
+  if (prospects.length === 0) return `<div class="empty-msg">${rechercheTexte.trim() ? "Aucun prospect ne correspond à cette recherche." : "Aucun prospect pour le moment."}</div>`;
+  const rows = prospects.map(p => {
+    let prochaineActionHtml;
+    if (p.statut === "Recontacter" || p.statut === "Pas maintenant") {
+      const overdue = p.dateRappel && isOverdue(p.dateRappel);
+      prochaineActionHtml = `<input class="note-input ${overdue ? "next-action--overdue" : ""}" type="date" value="${frDateToIso(p.dateRappel)}" data-action="update-field" data-champ="dateRappel">`;
+    } else if (RELANCE_STATUTS.indexOf(p.statut) !== -1) {
+      const relance = nextRelance(p);
+      const overdue = relance && isOverdue(relance);
+      const nRelances = Number(p.nbRelances) || 0;
+      const btnRelance = nRelances < 2
+        ? `<div><button class="link-btn" data-action="marquer-relance" data-ligne="${p.ligne}">Relance envoyée</button></div>`
+        : "";
+      prochaineActionHtml = (relance
+        ? `<span class="next-action ${overdue ? "next-action--overdue" : "muted"}">Relance ${escapeHtml(relance)}</span>`
+        : `<span class="next-action muted">—</span>`) + btnRelance;
+    } else {
+      prochaineActionHtml = `<span class="next-action muted">—</span>`;
+    }
+
+    const statutClass = STATUT_CLASS[p.statut] || "st-neutral";
+    const statutOptions = STATUT_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === p.statut ? "selected" : ""}>${escapeHtml(o)}</option>`).join("");
+    const tempOptions = TEMP_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === p.temperature ? "selected" : ""}>${escapeHtml(o)}</option>`).join("");
+
+    const sousLignes = [p.lieu, p.age ? p.age + " ans" : ""].filter(Boolean).join(" · ");
+    const lienBtn = p.lien ? `<a class="link-btn link-btn--accent" href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Profil →</a>` : "";
+    const messageBtn = `<button class="link-btn" data-action="copy-message" data-nom="${escapeHtml(p.nom)}" data-statut="${escapeHtml(p.statut || "")}">Copier msg</button>`;
+
+    return `
+      <tr data-ligne="${p.ligne}">
+        <td data-label="Nom"><div class="name-cell">${escapeHtml(p.nom)}</div>${sousLignes ? `<div class="muted">${escapeHtml(sousLignes)}</div>` : ""}</td>
+        <td data-label="Poste"><input class="note-input" value="${escapeHtml(p.poste || "")}" placeholder="—" data-action="update-field" data-champ="poste"></td>
+        <td data-label="LinkedIn"><div class="row-actions" style="justify-content:flex-start;">${lienBtn}${messageBtn}</div></td>
+        <td data-label="Canal"><select class="note-input" data-action="update-field" data-champ="canal">${canalOptionsHtml(p.canal)}</select></td>
+        <td data-label="Statut">
+          <select class="statut-select ${statutClass}" data-action="update-field" data-champ="statut" data-prev="${escapeHtml(p.statut || "")}">${statutOptions}</select>
+        </td>
+        <td data-label="Température">
+          <select class="temp-select ${tempClass(p.temperature)}" data-action="update-field" data-champ="temperature">
+            <option value="">—</option>${tempOptions}
+          </select>
+        </td>
+        <td data-label="Appel découverte"><input class="note-input" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" data-action="update-field" data-champ="dateAppelDecouverte"></td>
+        <td data-label="1er message"><input class="note-input" type="date" value="${frDateToIso(p.date1erMessage)}" data-action="update-field" data-champ="date1erMessage"></td>
+        <td data-label="Prochaine action">${prochaineActionHtml}</td>
+        <td data-label="Email"><input class="note-input" value="${escapeHtml(p.email || "")}" placeholder="—" data-action="update-field" data-champ="email"></td>
+        <td data-label="Téléphone"><input class="note-input" value="${escapeHtml(p.telephone || "")}" placeholder="—" data-action="update-field" data-champ="telephone"></td>
+        <td data-label="Note"><input class="note-input" value="${escapeHtml(p.note || "")}" placeholder="—" data-action="update-field" data-champ="note"></td>
+        <td>
+          <div class="row-actions">
+            <button class="link-btn" data-action="delete-prospect" data-nom="${escapeHtml(p.nom)}">Suppr.</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  const arrow = (champ) => prospectSort && prospectSort.champ === champ ? (prospectSort.dir === 1 ? " ↑" : " ↓") : "";
+  return `
+    <div class="table-wrap">
+      <table class="table-prospects">
+        <colgroup>
+          <col style="width:10%"><col style="width:13%"><col style="width:9%"><col style="width:5%">
+          <col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:7%">
+          <col style="width:9%"><col style="width:7%"><col style="width:6%"><col style="width:8%">
+          <col style="width:5%">
+        </colgroup>
+        <thead><tr><th>Nom</th><th>Poste</th><th>LinkedIn</th><th>Canal</th><th class="th-sortable" onclick="toggleSort('statut')">Statut${arrow("statut")}</th><th class="th-sortable" onclick="toggleSort('temperature')">T°${arrow("temperature")}</th><th>Appel<br>découverte</th><th>1er<br>message</th><th>Prochaine<br>action</th><th>Email</th><th>Téléphone</th><th>Note</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ─── Onglet Clients ───
+
+function renderClientsSection(clients) {
+  const rechercheNorm = normaliserTexte(rechercheTexte);
+  const visibles = rechercheTexte.trim()
+    ? clients.filter(c => normaliserTexte(c.nom).indexOf(rechercheNorm) !== -1)
+    : clients;
+  return `
+    <div class="section">
+      <div class="section__head">
+        <span class="section__eyebrow">Clientes</span>
+        <div style="display:flex;gap:0.75rem;align-items:center;">
+          <input type="search" id="recherche-clients" class="recherche-input" placeholder="Rechercher un nom…" value="${escapeHtml(rechercheTexte)}" oninput="onRechercheInput(this)">
+          <button class="btn btn--ghost" onclick="openAddClientModal()">+ Ajouter une cliente</button>
+        </div>
+      </div>
+      ${renderClientsTable(visibles)}
+    </div>
+  `;
+}
+
+function paiementCellHtml(c) {
+  const nbActuel = Number(c.nombreVersements) || 1;
+  const nbOptions = [1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === nbActuel ? "selected" : ""}>${n} versement${n > 1 ? "s" : ""}</option>`).join("");
+  return `
+    <div class="paiement-cell">
+      <div class="paiement-row">
+        <select class="paiement-nb" data-action="update-client-field" data-champ="nombreVersements" title="Nombre de versements">${nbOptions}</select>
+      </div>
+      <div class="paiement-row">
+        <span class="paiement-label">1er versement le</span>
+        <input type="date" class="paiement-date1" value="${frDateToIso(c.date1erVersement)}" data-action="update-client-field" data-champ="date1erVersement">
+      </div>
+      <div class="paiement-reste">Reste dû : <b>${resteDu(c).toLocaleString("fr-FR")}€</b></div>
+      <label class="paiement-echec">
+        <input type="checkbox" ${c.echecPaiement ? "checked" : ""} data-action="update-client-checkbox" data-champ="echecPaiement">
+        Échec de paiement
+      </label>
+    </div>
+  `;
+}
+
+function renderClientsTable(clients) {
+  if (clients.length === 0) return `<div class="empty-msg">${rechercheTexte.trim() ? "Aucune cliente ne correspond à cette recherche." : "Aucune cliente pour le moment."}</div>`;
+  const rows = clients.map(c => {
+    const formuleOptions = FORMULE_OPTIONS.map(o => `<option value="${o}" ${o === c.formule ? "selected" : ""}>${o}</option>`).join("");
+    const sousLigne = [c.metier, c.age ? c.age + " ans" : ""].filter(Boolean).join(" · ");
+    const finDate = parseFrDate(c.finAccompagnement);
+    const inactive = finDate && finDate <= today0();
+    const rowStyle = inactive ? "background:rgba(118,118,118,0.08);" : "background:rgba(21,128,61,0.05);";
+    return `
+    <tr data-ligne="${c.ligne}" style="${rowStyle}">
+      <td data-label="Nom"><div class="name-cell">${escapeHtml(c.nom)}</div>${sousLigne ? `<div class="muted">${escapeHtml(sousLigne)}</div>` : ""}</td>
+      <td data-label="Formule">
+        <select class="formule-select ${formuleClass(c.formule)}" data-action="update-client-field" data-champ="formule">
+          <option value="">—</option>${formuleOptions}
+        </select>
+      </td>
+      <td data-label="Montant"><input class="note-input" type="number" value="${Number(c.montant || 0)}" data-action="update-client-field" data-champ="montant"></td>
+      <td data-label="Canal"><select class="note-input" data-action="update-client-field" data-champ="canal">${canalOptionsHtml(c.canal)}</select></td>
+      <td data-label="Signature"><input class="note-input" type="date" value="${frDateToIso(c.date)}" data-action="update-client-field" data-champ="date"></td>
+      <td data-label="Paiement">${paiementCellHtml(c)}</td>
+      <td data-label="NB Séances"><input class="note-input" style="max-width:90px;text-overflow:ellipsis;" title="Format : séance actuelle / nb total prévu, ex. 3/7" value="${escapeHtml(c.datesSeances || "")}" placeholder="ex: 3/7" data-action="update-client-field" data-champ="datesSeances"></td>
+      <td data-label="Fin"><input class="note-input" type="date" value="${frDateToIso(c.finAccompagnement)}" data-action="update-client-field" data-champ="finAccompagnement"></td>
+      <td data-label="Prochaine action"><input class="note-input" value="${escapeHtml(c.prochaineAction || "")}" placeholder="—" data-action="update-client-field" data-champ="prochaineAction"></td>
+      <td data-label="Commentaire"><input class="note-input" value="${escapeHtml(c.commentaire || "")}" placeholder="—" data-action="update-client-field" data-champ="commentaire"></td>
+      <td><div class="row-actions"><button class="link-btn" data-action="delete-client" data-nom="${escapeHtml(c.nom)}">Supprimer</button></div></td>
+    </tr>
+  `;
+  }).join("");
+
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nom</th><th>Formule</th><th>Montant</th><th>Canal</th><th>Signature</th><th title="Nombre de versements + date du 1er versement — les échéances mensuelles et le reste dû se calculent automatiquement à partir du Montant">Paiement</th><th title="Format libre : séance actuelle / nb total prévu, ex. 3/7">NB Séances</th><th>Fin</th><th>Prochaine action</th><th>Commentaire</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Mise a jour optimiste : on applique la valeur localement et on re-rend tout
+// de suite (pas d'attente reseau), au lieu d'appeler loadData(true) qui recharge
+// et reconstruit tout le tableau -- ce plein rebuild, survenant de facon
+// asynchrone et imprevisible, coupait net toute interaction en cours sur un
+// autre champ de la meme ligne (ex. un selecteur de date natif qui se ferme
+// tout seul en pleine selection). En cas d'echec, on recharge pour resynchroniser.
+// Recalcule Relance 1/2 immediatement en local quand la Date 1er message
+// change, sans attendre le prochain rechargement -- meme calcul (J+5/J+12)
+// que cote Code.gs (listerDonnees), pour rester coherent avec le serveur.
+function ajouterJoursFr(date, jours) {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + jours);
+  return d.toLocaleDateString("fr-FR");
+}
+async function updateField(ligne, champ, valeur) {
+  const p = currentData.prospects.find(x => x.ligne === ligne);
+  if (p) {
+    p[champ] = coerceValeurLocale(champ, valeur);
+    if (champ === "statut" && valeur === "Appel découverte") {
+      p.dateAppelDecouverte = new Date().toLocaleDateString("fr-FR").replace(/\./g, "");
+    }
+    if (champ === "date1erMessage") {
+      const base = parseFrDate(p.date1erMessage);
+      if (base) {
+        p.relance1 = ajouterJoursFr(base, 5);
+        p.relance2 = ajouterJoursFr(base, 12);
+      }
+    }
+    render(currentData);
+  }
+  let res;
+  try {
+    res = await jsonpCall({ action: "updateProspect", ligne, champ, valeur });
+  } catch (e) {
+    alert("Échec de l'enregistrement (connexion). Réessaie.");
+    loadData(true);
+    return;
+  }
+  if (!res || !res.ok) {
+    alert("Échec de l'enregistrement : " + (res && res.erreur ? res.erreur : "erreur inconnue"));
+    loadData(true);
+  }
+}
+
+async function updateClientField(ligne, champ, valeur) {
+  const c = currentData.clients.find(x => x.ligne === ligne);
+  if (c) {
+    c[champ] = coerceValeurLocale(champ, valeur);
+    render(currentData);
+  }
+  let res;
+  try {
+    res = await jsonpCall({ action: "updateClient", ligne, champ, valeur });
+  } catch (e) {
+    alert("Échec de l'enregistrement (connexion). Réessaie.");
+    loadData(true);
+    return;
+  }
+  if (!res || !res.ok) {
+    alert("Échec de l'enregistrement : " + (res && res.erreur ? res.erreur : "erreur inconnue"));
+    loadData(true);
+  }
+}
+
+async function deleteProspect(ligne, nom) {
+  if (!confirm("Supprimer " + nom + " des prospects ?")) return;
+  await jsonpCall({ action: "deleteProspect", ligne });
+  loadData(true);
+}
+async function deleteClient(ligne, nom) {
+  if (!confirm("Supprimer " + nom + " des clientes ?")) return;
+  await jsonpCall({ action: "deleteClient", ligne });
+  loadData(true);
+}
+
+// ─── Modales ───
+
+let pendingRevertSelect = null;
+
+function closeModal() {
+  document.getElementById("modal-overlay").hidden = true;
+  document.getElementById("modal-content").className = "modal";
+  if (pendingRevertSelect) {
+    pendingRevertSelect.value = pendingRevertSelect.dataset.prev || "";
+    pendingRevertSelect = null;
+  }
+}
+
+function openAddProspectModal() {
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Ajouter un prospect</h2>
+    <label>Nom</label><input id="m-nom" type="text">
+    <label>Lien LinkedIn</label><input id="m-lien" type="text">
+    <label>Poste / activité</label><input id="m-poste" type="text">
+    <label>Localisation</label><input id="m-lieu" type="text">
+    <label>Âge (optionnel)</label><input id="m-age" type="number">
+    <label>Canal</label><select id="m-canal">${canalOptionsHtml("LinkedIn")}</select>
+    <label>Origine</label><input id="m-origine" type="text" placeholder="ex: post infidélité">
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="submitAddProspect()">Ajouter</button>
+    </div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitAddProspect() {
+  const nom = document.getElementById("m-nom").value.trim();
+  if (!nom) return;
+  await jsonpCall({
+    action: "addProspect",
+    nom,
+    lien: document.getElementById("m-lien").value.trim(),
+    poste: document.getElementById("m-poste").value.trim(),
+    lieu: document.getElementById("m-lieu").value.trim(),
+    age: document.getElementById("m-age").value.trim(),
+    canal: document.getElementById("m-canal").value,
+    origine: document.getElementById("m-origine").value.trim(),
+    statut: "Nouveau"
+  });
+  closeModal();
+  loadData(true);
+}
+
+function openTemplatesModal() {
+  const t = messageTemplatesActuels();
+  const rappel = (currentData.objectifs && currentData.objectifs.templateRappel) || DEFAULT_TEMPLATE_RAPPEL;
+  const zoneStyle = "width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;";
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Templates de messages</h2>
+    <label>Message — Nouveau contact</label>
+    <textarea id="tpl-nouveau" rows="7" style="${zoneStyle}">${escapeHtml(t["Nouveau"])}</textarea>
+    <label style="margin-top:1rem;">Message — Première relance</label>
+    <textarea id="tpl-r1" rows="4" style="${zoneStyle}">${escapeHtml(t["Première relance"])}</textarea>
+    <label style="margin-top:1rem;">Message — Deuxième relance</label>
+    <textarea id="tpl-r2" rows="4" style="${zoneStyle}">${escapeHtml(t["Deuxième relance"])}</textarea>
+    <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
+    <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
+    <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les 4 messages.</p>
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn" id="tpl-submit-btn" onclick="submitTemplates()">Enregistrer les templates</button>
+    </div>
+    <p class="lock-error" id="tpl-error" style="text-align:left;"></p>
+  `;
+  document.getElementById("modal-content").className = "modal modal--wide";
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitTemplates() {
+  const btn = document.getElementById("tpl-submit-btn");
+  const errorEl = document.getElementById("tpl-error");
+  errorEl.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "Enregistrement...";
+  let res;
+  try {
+    res = await jsonpCall({
+      action: "setObjectifs",
+      templateNouveau: document.getElementById("tpl-nouveau").value,
+      templatePremiereRelance: document.getElementById("tpl-r1").value,
+      templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
+      templateRappel: document.getElementById("tpl-rappel").value
+    });
+  } catch (e) {
+    res = null;
+  }
+  btn.disabled = false;
+  btn.textContent = "Enregistrer les templates";
+  if (!res || !res.ok) {
+    errorEl.textContent = "Échec : " + (res && res.erreur ? res.erreur : "connexion impossible") + ".";
+    errorEl.style.display = "block";
+    return;
+  }
+  closeModal();
+  loadData(true);
+}
+
+function openConvertModal(ligne, nom, revertSelect) {
+  pendingRevertSelect = revertSelect || null;
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Convertir ${escapeHtml(nom)} en cliente</h2>
+    <label>Formule</label>
+    <select id="m-formule" onchange="onFormuleChange(this, 'm-montant')">${formuleOptionsHtml()}</select>
+    <label>Montant (€)</label><input id="m-montant" type="number">
+    <label>Commentaire</label><input id="m-commentaire" type="text">
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="submitConvert(${ligne})">Convertir</button>
+    </div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitConvert(ligne) {
+  pendingRevertSelect = null;
+  await jsonpCall({
+    action: "convertToClient",
+    ligne,
+    formule: document.getElementById("m-formule").value.trim(),
+    montant: document.getElementById("m-montant").value.trim(),
+    commentaire: document.getElementById("m-commentaire").value.trim()
+  });
+  document.getElementById("modal-overlay").hidden = true;
+  loadData(true);
+}
+
+function openAddClientModal() {
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Ajouter une cliente</h2>
+    <label>Nom</label><input id="m-cnom" type="text">
+    <label>Formule</label>
+    <select id="m-cformule" onchange="onFormuleChange(this, 'm-cmontant')">${formuleOptionsHtml()}</select>
+    <label>Montant (€)</label><input id="m-cmontant" type="number">
+    <label>Métier (optionnel)</label><input id="m-cmetier" type="text">
+    <label>Âge (optionnel)</label><input id="m-cage" type="number">
+    <label>Canal</label><select id="m-ccanal">${canalOptionsHtml("LinkedIn")}</select>
+    <label>Commentaire</label><input id="m-ccommentaire" type="text">
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="submitAddClient()">Ajouter</button>
+    </div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitAddClient() {
+  const nom = document.getElementById("m-cnom").value.trim();
+  if (!nom) return;
+  await jsonpCall({
+    action: "addClient",
+    nom,
+    formule: document.getElementById("m-cformule").value.trim(),
+    montant: document.getElementById("m-cmontant").value.trim(),
+    metier: document.getElementById("m-cmetier").value.trim(),
+    age: document.getElementById("m-cage").value.trim(),
+    canal: document.getElementById("m-ccanal").value,
+    commentaire: document.getElementById("m-ccommentaire").value.trim()
+  });
+  closeModal();
+  loadData(true);
+}
+
+// ─── Popup de relance quotidienne (une fois par jour) ───
+
+function maybeShowReminderPopup(data) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem("crmPopupShown") === todayKey) return;
+
+  const relances = [];
+  const recontacts = [];
+  const connexionsAPurger = [];
+  for (const p of data.prospects) {
+    const r = nextRelance(p);
+    if (r && isOverdue(r)) relances.push(p);
+    else if (p.dateRappel && isOverdue(p.dateRappel)) recontacts.push(p);
+    if (p.statut === "En attente de connexion" && p.dateAttenteConnexion) {
+      const d = parseFrDate(p.dateAttenteConnexion);
+      if (d && Math.round((today0() - d) / 86400000) >= 21) connexionsAPurger.push(p);
+    }
+  }
+  if (relances.length === 0 && recontacts.length === 0 && connexionsAPurger.length === 0) return;
+
+  const relanceItems = relances.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Relance à envoyer</span></li>`).join("");
+  const recontactItems = recontacts.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">A recontacter</span></li>`).join("");
+  const connexionItems = connexionsAPurger.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Connexion en attente depuis 3+ semaines — à supprimer</span></li>`).join("");
+
+  document.getElementById("reminder-content").innerHTML = `
+    <h2>${relances.length + recontacts.length + connexionsAPurger.length} personne(s) nécessitent une action aujourd'hui</h2>
+    <ul class="reminder-list">${relanceItems}${recontactItems}${connexionItems}</ul>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('reminder-overlay').hidden = true;">C'est noté</button>
+    </div>
+  `;
+  document.getElementById("reminder-overlay").hidden = false;
+  localStorage.setItem("crmPopupShown", todayKey);
+}
+
+// ─── Onglets ───
+
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".tab-btn");
+  if (!btn) return;
+  currentTab = btn.dataset.tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+  document.querySelectorAll(".tab-panel").forEach(p => p.hidden = (p.id !== "tab-" + currentTab));
+});
+
+// ─── Delegation d'evenements (le contenu des onglets est regenere a chaque loadData) ───
+
+document.getElementById("app").addEventListener("change", (e) => {
+  const elP = e.target.closest("[data-action='update-field']");
+  if (elP) {
+    const ligne = Number(elP.closest("tr").dataset.ligne);
+    if (elP.dataset.champ === "statut" && elP.value === "Client") {
+      const nom = elP.closest("tr").querySelector(".name-cell").textContent;
+      openConvertModal(ligne, nom, elP);
+      return;
+    }
+    updateField(ligne, elP.dataset.champ, elP.value);
+    return;
+  }
+  const elC = e.target.closest("[data-action='update-client-field']");
+  if (elC) {
+    const ligne = Number(elC.closest("tr").dataset.ligne);
+    updateClientField(ligne, elC.dataset.champ, elC.value);
+    return;
+  }
+  const elChk = e.target.closest("[data-action='update-client-checkbox']");
+  if (elChk) {
+    const ligne = Number(elChk.closest("tr").dataset.ligne);
+    updateClientField(ligne, elChk.dataset.champ, elChk.checked ? "true" : "false");
+  }
+});
+
+document.getElementById("app").addEventListener("focusout", (e) => {
+  const elP = e.target.closest("input[data-action='update-field']");
+  if (elP) {
+    const ligne = Number(elP.closest("tr").dataset.ligne);
+    updateField(ligne, elP.dataset.champ, elP.value);
+    return;
+  }
+  const elC = e.target.closest("input[data-action='update-client-field']");
+  if (elC) {
+    const ligne = Number(elC.closest("tr").dataset.ligne);
+    updateClientField(ligne, elC.dataset.champ, elC.value);
+  }
+});
+
+document.getElementById("app").addEventListener("click", (e) => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const tr = el.closest("tr");
+  const ligne = el.dataset.ligne ? Number(el.dataset.ligne) : (tr ? Number(tr.dataset.ligne) : null);
+  const nom = el.dataset.nom;
+  if (el.dataset.action === "delete-prospect") deleteProspect(ligne, nom);
+  else if (el.dataset.action === "delete-client") deleteClient(ligne, nom);
+  else if (el.dataset.action === "copy-message") copierMessage(nom, el.dataset.statut);
+  else if (el.dataset.action === "copy-rappel") copierRappel(nom);
+  else if (el.dataset.action === "marquer-relance") marquerRelanceEnvoyee(ligne);
+});
+
+document.getElementById("lock-pwd").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitPassword();
+});
+
+loadData();
+</script>
+
+</body>
+</html>
