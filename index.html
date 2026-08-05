@@ -779,7 +779,7 @@ function templateKeyPourEnvoi(p) {
 }
 function rappelsADemainHtml(prospects, obj) {
   const aujourdhui = today0();
-  const matches = prospects
+  const upcoming = prospects
     .filter(p => {
       const d = parseFrDate(p.dateAppelDecouverte);
       if (!d) return false;
@@ -787,19 +787,41 @@ function rappelsADemainHtml(prospects, obj) {
       return diff === 1 || diff === 2;
     })
     .sort((a, b) => parseFrDate(a.dateAppelDecouverte) - parseFrDate(b.dateAppelDecouverte));
-  const aDecider = prospects.filter(p => p.statut === "Appel découverte" && estADecider(p));
-  if (!matches.length && !aDecider.length) return `<p class="muted">Rien pour l'instant.</p>`;
-  const rows = matches.map(p => `
-    <div class="rappel-item">
-      <span><b>${escapeHtml(p.nom)}</b> — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
-      <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
-    </div>
-  `).join("");
-  const rowsADecider = aDecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — appel tenu, à trancher</span></div>`).join("");
-  return `
-    ${matches.length ? `<div class="rappels-list">${rows}</div>` : `<p class="muted">Aucun appel découverte dans les 24-48h à venir.</p>`}
-    ${aDecider.length ? `<p class="muted" style="margin-top:0.75rem;">À trancher :</p><div class="rappels-list">${rowsADecider}</div>` : ""}
-  `;
+  const appelADecider = prospects.filter(p => p.statut === "Appel découverte" && estADecider(p));
+  const repriseADecider = prospects.filter(p => p.statut === "Reprise de contact" && estADecider(p))
+    .sort((a, b) => parseFrDate(a.dateEntreeStatutRelance) - parseFrDate(b.dateEntreeStatutRelance));
+  const deuxiemeADecider = prospects.filter(p => p.statut === "Deuxième relance" && estADecider(p))
+    .sort((a, b) => parseFrDate(a.dateEntreeStatutRelance) - parseFrDate(b.dateEntreeStatutRelance));
+
+  if (!upcoming.length && !appelADecider.length && !repriseADecider.length && !deuxiemeADecider.length) {
+    return `<p class="muted">Rien pour l'instant.</p>`;
+  }
+
+  const groupeAppel = (upcoming.length || appelADecider.length) ? `
+    <div class="rappel-groupe">
+      <p class="muted" style="margin-bottom:0.4rem;"><b>Appel découverte</b></p>
+      ${upcoming.length ? `<div class="rappels-list">${upcoming.map(p => `
+        <div class="rappel-item">
+          <span><b>${escapeHtml(p.nom)}</b> — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
+          <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
+        </div>
+      `).join("")}</div>` : ""}
+      ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — appel tenu, à évaluer</span></div>`).join("")}</div>` : ""}
+    </div>` : "";
+
+  const groupeReprise = repriseADecider.length ? `
+    <div class="rappel-groupe" style="margin-top:0.75rem;">
+      <p class="muted" style="margin-bottom:0.4rem;"><b>Reprise de contact J+7</b></p>
+      <div class="rappels-list">${repriseADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
+    </div>` : "";
+
+  const groupeDeuxieme = deuxiemeADecider.length ? `
+    <div class="rappel-groupe" style="margin-top:0.75rem;">
+      <p class="muted" style="margin-bottom:0.4rem;"><b>Deuxième relance J+7</b></p>
+      <div class="rappels-list">${deuxiemeADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
+    </div>` : "";
+
+  return groupeAppel + groupeReprise + groupeDeuxieme;
 }
 // Simple aperçu (pas d'action ici) -- Marie traite les relances depuis
 // l'onglet Prospects, ou le lien profil et le tri sont deja sous les yeux.
@@ -1126,7 +1148,7 @@ function renderDashboard(data) {
         </div>
         <div class="rappels-relances-box rappels-relances-box--rappels">
           <div class="rappels-relances-box__titre">Rappels</div>
-          <p class="muted" style="margin-bottom:0.75rem;">Appels découverte à venir ou à trancher.</p>
+          <p class="muted" style="margin-bottom:0.75rem;">Appels découverte à venir ou à évaluer.</p>
           ${rappelsADemainHtml(data.prospects, obj)}
         </div>
       </div>
@@ -1349,6 +1371,7 @@ function renderProspectsSection(prospects) {
           </select>
           ${btnNouveau}${btnHorsCible}
           <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
+          <button class="btn btn--ghost" onclick="ouvrirRafalePremiersMessages()">Rafale : premiers messages</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
           <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
         </div>
@@ -1788,14 +1811,17 @@ async function submitAddClient() {
 }
 
 // ─── Mode rafale (traitement en serie sur les ~2500 abonnes) ───
-// Deux ecrans distincts et volontairement separes (voir discussion avec
-// Marie) : la Rafale 1 (tri, depuis l'onglet Prospects) classe rapidement les
-// prospects "Nouveau" ambigus (jamais contactes vs. deja contactes il y a des
-// mois, avant que ce suivi existe) sans jamais envoyer de message -- pas
-// d'ambiguite possible sur quel texte envoyer. La Rafale 2 (actions, depuis
-// le tableau de bord) traite ensuite tout ce qui est actionnable aujourd'hui
-// -- envoi des messages en attente ET decisions J+7/J+1 -- en une seule file
-// triee par urgence, chaque carte adaptee a son type.
+// Trois ecrans distincts (voir discussion avec Marie). Deux temporaires, le
+// temps d'ecouler le stock de prospects "Nouveau" jamais catalogues, tous les
+// deux dans l'onglet Prospects : la Rafale "trier" classe rapidement les
+// ambigus (jamais contactes vs. deja contactes il y a des mois, avant que ce
+// suivi existe) sans jamais envoyer de message ; la Rafale "premiers
+// messages" envoie ensuite le tout premier message aux "Nouveau" tries.
+// Le troisieme, "Rafale : actions" (tableau de bord), est permanent : il
+// traite tout ce qui revient en continu une fois le stock ecoule -- envoi des
+// relances/reprises en attente ET decisions J+7/J+1 -- en une seule file
+// triee par urgence, chaque carte adaptee a son type. Les trois partagent le
+// meme mecanisme de carte (rafaleMode "actions"), seule la file differe.
 let rafaleMode = null; // "tri" | "actions"
 let rafaleQueue = [];
 let rafaleIndex = 0;
@@ -1953,17 +1979,29 @@ function urgencePourActions(p) {
   if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
   const r = nextRelance(p);
   if (r) return parseFrDate(r);
-  return today0(); // Nouveau jamais contacte / Reprise de contact jamais envoyee : pas de date naturelle
+  return today0(); // Reprise de contact jamais envoyee : pas de date naturelle
 }
 function rafaleActionsCandidats() {
+  // "Nouveau" (premier message jamais envoye) est volontairement exclu : c'est
+  // le stock temporaire des ~2300 abonnes a rattraper, traite a part par
+  // "Rafale : premiers messages" (onglet Prospects). Rafale : actions ne
+  // couvre que ce qui reviendra en continu une fois ce stock ecoule.
   return currentData.prospects.filter(p => {
     if (estADecider(p)) return true;
-    if (p.statut === "Nouveau" && !p.date1erMessage) return true;
     if (p.statut === "Première relance") return true;
     if (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2) return true;
     if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+}
+function ouvrirRafalePremiersMessages() {
+  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).slice().sort((a, b) => a.ligne - b.ligne);
+  if (rafaleQueue.length === 0) { alert("Rien à envoyer : aucun prospect Nouveau jamais contacté."); return; }
+  rafaleMode = "actions";
+  rafaleIndex = 0;
+  document.getElementById("rafale-overlay").hidden = false;
+  if (rafaleQueue[0].lien) window.open(rafaleQueue[0].lien, "_blank");
+  renderRafaleActionCard();
 }
 function ouvrirRafaleActions() {
   rafaleQueue = rafaleActionsCandidats();
