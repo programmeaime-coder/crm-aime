@@ -332,6 +332,10 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
   <div class="modal modal--wide" id="rafale-content"></div>
 </div>
 
+<div class="modal-overlay" id="message-positif-overlay" hidden>
+  <div class="modal" id="message-positif-content"></div>
+</div>
+
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
 
@@ -613,7 +617,7 @@ async function submitPassword() {
   currentData = res;
   document.getElementById("lock-screen").hidden = true;
   render(res);
-  maybeShowReminderPopup(res);
+  maybeShowMessagePositifPopup(res);
 }
 
 async function loadData(skipPopup) {
@@ -631,7 +635,7 @@ async function loadData(skipPopup) {
     return;
   }
   render(currentData);
-  if (!skipPopup) maybeShowReminderPopup(currentData);
+  if (!skipPopup) maybeShowMessagePositifPopup(currentData);
 }
 
 function render(data) {
@@ -2125,6 +2129,30 @@ document.addEventListener("keydown", (e) => {
     }
   }
 });
+
+// ─── Popup de message positif (une fois par jour, avant le popup de rappels) ───
+// Alimente par l'onglet "MessagesPositifs" du Google Sheet (colonne A, un
+// message par ligne, Marie colle directement dedans -- pas d'ecriture depuis
+// le CRM pour cet onglet). Enchaine sur maybeShowReminderPopup a la fermeture,
+// pour que les deux popups quotidiens ne se chevauchent jamais.
+function maybeShowMessagePositifPopup(data) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const messages = (data.messagesPositifs || []).filter(Boolean);
+  if (localStorage.getItem("crmMessagePositifShown") === todayKey || messages.length === 0) {
+    maybeShowReminderPopup(data);
+    return;
+  }
+  const choix = messages[Math.floor(Math.random() * messages.length)];
+  document.getElementById("message-positif-content").innerHTML = `
+    <h2>Petit mot du jour</h2>
+    <p style="font-size:16px;line-height:1.6;margin:1rem 0 1.5rem;">${escapeHtml(choix)}</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('message-positif-overlay').hidden = true; maybeShowReminderPopup(currentData);">C'est noté</button>
+    </div>
+  `;
+  document.getElementById("message-positif-overlay").hidden = false;
+  localStorage.setItem("crmMessagePositifShown", todayKey);
+}
 
 // ─── Popup de relance quotidienne (une fois par jour) ───
 
