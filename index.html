@@ -322,6 +322,10 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
   <div class="modal" id="reminder-content"></div>
 </div>
 
+<div class="modal-overlay" id="rafale-overlay" hidden>
+  <div class="modal modal--wide" id="rafale-content"></div>
+</div>
+
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
 
@@ -508,6 +512,36 @@ function nextRelance(p) {
   const n = Number(p.nbRelances) || 0;
   if (n === 0 && p.relance1) return p.relance1;
   if (n === 1 && p.relance2) return p.relance2;
+  return null;
+}
+// Statuts "en attente d'une decision" qui, sans intervention de Marie, ne
+// remontent plus jamais dans aucune liste -- passe le delai sans changement
+// de statut, on les remonte en tete du tableau Prospects pour qu'elle
+// tranche. dateChamp = colonne source de la date de depart ; boutons = les
+// classements rapides proposes (voir renderProspectsTable / classerProspect).
+const DECISION_CONFIG = {
+  "Deuxième relance": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
+  "Reprise de contact": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
+  "Appel découverte": { dateChamp: "dateAppelDecouverte", delaiJours: 1, boutons: ["Devient cliente", "Pas maintenant", "Hors cible"], libelle: j => `À décider (appel il y a ${j}j)` }
+};
+function joursEcoules(dateStr) {
+  const d = parseFrDate(dateStr);
+  return d ? Math.round((today0() - d) / 86400000) : null;
+}
+function estADecider(p) {
+  const cfg = DECISION_CONFIG[p.statut];
+  if (!cfg) return false;
+  const j = joursEcoules(p[cfg.dateChamp]);
+  return j !== null && j >= cfg.delaiJours;
+}
+// Date servant a trier le groupe "en retard/a decider" (le plus ancien en
+// tete) : la date de relance pour une relance en retard, la date de depart
+// du delai (cfg.dateChamp) pour un "a decider".
+function dateUrgence(p) {
+  const r = nextRelance(p);
+  if (r && isOverdue(r)) return parseFrDate(r);
+  const cfg = DECISION_CONFIG[p.statut];
+  if (cfg && estADecider(p)) return parseFrDate(p[cfg.dateChamp]);
   return null;
 }
 function escapeHtml(str) {
@@ -728,6 +762,15 @@ function messageTemplatesActuels() {
     "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"]
   };
 }
+// Le Statut nomme deja l'etape EN ATTENTE (voir updateField/date1erMessage et
+// marquerRelanceEnvoyee), donc il donne directement la bonne cle de template
+// dans (quasi) tous les cas. Seul garde-fou : un vieux prospect "Nouveau" avec
+// une Date 1er message deja renseignee (donnee anterieure a ce mecanisme) doit
+// quand meme proposer le texte de Premiere relance, pas re-proposer l'accroche.
+function templateKeyPourEnvoi(p) {
+  if (p.statut === "Nouveau" && p.date1erMessage) return "Première relance";
+  return p.statut;
+}
 function rappelsADemainHtml(prospects, obj) {
   const aujourdhui = today0();
   const matches = prospects
@@ -766,20 +809,24 @@ function relancesADemainHtml(prospects) {
     ${ligneRelance("Deuxième relance", deuxieme)}
   </div>`;
 }
-// Fait avancer Nb relances ET Statut ensemble (Nouveau -> Premiere relance ->
-// Deuxieme relance), pour que les deux restent toujours synchronises. Avant ce
-// fix, seul Nb relances avancait -- si le meme prospect etait marque "Relance
-// envoyee" une seconde fois (depuis le dashboard puis depuis Prospects, par
-// exemple) sans que le Statut ait bouge entre-temps, Nb relances pouvait
-// sauter de 0 a 2 d'un coup, ce qui videt "Prochaine action" (non gere au-dela
-// de 1) sans que le Statut ne l'ait jamais reflete.
+// Fait avancer Nb relances ET Statut ensemble, pour que les deux restent
+// toujours synchronises (evite le flash ou l'action se met a jour avant le
+// Statut si on faisait deux appels non coordonnes). Le Statut nomme l'etape
+// EN ATTENTE (voir updateField/date1erMessage) : "Deuxieme relance" veut donc
+// dire "en attente de la 2e relance" (n=1) OU "2e relance envoyee, en attente
+// de decision" (n=2) -- ce dernier cas active le suivi J+7 (DECISION_CONFIG).
 async function marquerRelanceEnvoyee(ligne) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
   if (!p) return;
   const n = Number(p.nbRelances) || 0;
   if (n >= 2) return;
-  const nouveauStatut = n === 0 ? "Première relance" : "Deuxième relance";
+  p.statut = "Deuxième relance";
   await updateField(ligne, "nbRelances", String(n + 1));
+  await updateField(ligne, "statut", "Deuxième relance");
+}
+// Classement en un clic depuis le tag "À décider" (J+7 sans réponse sur
+// Deuxième relance / Reprise de contact) -- voir estADecider().
+async function classerProspect(ligne, nouveauStatut) {
   await updateField(ligne, "statut", nouveauStatut);
 }
 function copierRappel(nom) {
@@ -798,6 +845,17 @@ function compteAppelsDecouvertePeriode(prospects, clients, periode) {
   const nProspects = prospects.filter(p => { const d = parseFrDate(p.dateAppelDecouverte); return d && d >= debut; }).length;
   const nClients = clients.filter(c => { const d = parseFrDate(c.dateAppelDecouverte); return d && d >= debut; }).length;
   return nProspects + nClients;
+}
+// Taux de conversion REEL appel -> client, calcule sur les appels dont
+// l'issue a ete decidee (Client, ou Hors cible/Pas maintenant avec une date
+// d'appel decouverte renseignee) -- distinct de obj.tauxConversion qui est
+// une hypothese saisie a la main pour planifier le nombre d'appels a booker.
+function tauxConversionAppelReel(prospects, clients) {
+  const nClients = clients.filter(c => c.dateAppelDecouverte).length;
+  const nSansVente = prospects.filter(p => (p.statut === "Hors cible" || p.statut === "Pas maintenant") && p.dateAppelDecouverte).length;
+  const total = nClients + nSansVente;
+  if (total === 0) return null;
+  return { pct: Math.round((nClients / total) * 100), nClients, nSansVente, total };
 }
 
 function objectifTint(reel, objectif, periode) {
@@ -1000,7 +1058,17 @@ function roadmapObjectifsHtml(data, obj) {
 }
 
 function renderDashboard(data) {
-  const s = data.stats;
+  // Recalcule a chaque rendu a partir de data.prospects/data.clients (deja en
+  // memoire), plutot que de reutiliser l'instantane data.stats fige au dernier
+  // loadData() -- sinon une edition en direct (ex. montant d'une cliente dans
+  // l'onglet Clients) laissait "CA genere"/"Taux de conversion" faux tant
+  // qu'aucun rechargement complet n'etait declenche.
+  const totalProspects = data.prospects.length;
+  const totalClients = data.clients.length;
+  const totalContacts = totalProspects + totalClients;
+  const caGenere = data.clients.reduce((somme, c) => somme + (Number(c.montant) || 0), 0);
+  const tauxConversion = totalContacts > 0 ? Math.round((totalClients / totalContacts) * 100) : 0;
+  const s = { totalContacts, totalProspects, totalClients, caGenere, tauxConversion };
   const obj = data.objectifs || {};
   const maintenant = new Date();
   const plan = planAppelsMois(maintenant, data, obj);
@@ -1014,9 +1082,13 @@ function renderDashboard(data) {
   const reelSemaine = compteAppelsDecouvertePeriode(data.prospects, data.clients, "semaine");
   const rythmeSemaine = plan.appelsABooker > 0 ? Math.round(plan.appelsABooker / 4.33) : 0;
   const noShowPct = Math.round(plan.noShowRate * 100);
-  const noteProsp = plan.appelsABooker > 0
+  const tauxReel = tauxConversionAppelReel(data.prospects, data.clients);
+  const noteTauxReel = tauxReel
+    ? ` Taux de conversion réel : ${tauxReel.pct}% (${tauxReel.nClients} vente${tauxReel.nClients > 1 ? "s" : ""} sur ${tauxReel.total} appel${tauxReel.total > 1 ? "s" : ""} décidé${tauxReel.total > 1 ? "s" : ""} — hors appels pas encore classés).`
+    : "";
+  const noteProsp = (plan.appelsABooker > 0
     ? `${plan.clientsNecessaires} cliente${plan.clientsNecessaires > 1 ? "s" : ""} encore nécessaire${plan.clientsNecessaires > 1 ? "s" : ""} pour boucler le mois → ~${plan.appelsABooker} appel${plan.appelsABooker > 1 ? "s" : ""} à booker (marge no-show ${noShowPct}% incluse, calculée sur les 3 derniers mois) — soit ~${rythmeSemaine}/semaine. Cette semaine : ${reelSemaine}.`
-    : "Objectif du mois déjà atteint, ou panier moyen pas encore calculable (ajoute une date de paiement à au moins une cliente).";
+    : "Objectif du mois déjà atteint, ou panier moyen pas encore calculable (ajoute une date de paiement à au moins une cliente).") + noteTauxReel;
   const prospMois = objectifCardFeatured("Appels découverte — " + moisLabel(maintenant), compteAppelsDecouvertePeriode(data.prospects, data.clients, "mois"), plan.appelsABooker, "", "mois", noteProsp);
 
   return `
@@ -1132,7 +1204,6 @@ async function submitObjectifs() {
 
 // ─── Onglet Prospects ───
 
-const RELANCE_STATUTS = ["Nouveau", "Première relance"];
 let afficherNouveau = false;
 let afficherHorsCible = false;
 let filtreStatut = "";
@@ -1233,12 +1304,12 @@ function renderProspectsSection(prospects) {
   const pasMaintenant = visibles.filter(p => p.statut === "Pas maintenant");
   const horsCible = visibles.filter(p => p.statut === "Hors cible");
   const normales = visibles.filter(p => p.statut !== "Pas maintenant" && p.statut !== "Hors cible");
-  const relancesEnRetard = normales.filter(p => { const r = nextRelance(p); return r && isOverdue(r); });
-  const autresNormales = normales.filter(p => { const r = nextRelance(p); return !(r && isOverdue(r)); });
-  // Priorite par date de relance (la plus en retard en premier) -- toujours,
-  // meme si un tri par colonne (Statut/Temperature) est actif : ce groupe
-  // existe justement pour repondre a l'urgence chronologique, pas au pipeline.
-  relancesEnRetard.sort((a, b) => parseFrDate(nextRelance(a)) - parseFrDate(nextRelance(b)));
+  const relancesEnRetard = normales.filter(p => { const r = nextRelance(p); return (r && isOverdue(r)) || estADecider(p); });
+  const autresNormales = normales.filter(p => { const r = nextRelance(p); return !((r && isOverdue(r)) || estADecider(p)); });
+  // Priorite par date de relance/entree en statut (la plus ancienne en premier) --
+  // toujours, meme si un tri par colonne (Statut/Temperature) est actif : ce
+  // groupe existe justement pour repondre a l'urgence chronologique, pas au pipeline.
+  relancesEnRetard.sort((a, b) => dateUrgence(a) - dateUrgence(b));
   const lignesOrdonnees = [...relancesEnRetard, ...sortProspects(autresNormales), ...pasMaintenant, ...horsCible];
 
   const btnNouveau = nbNouveau > 0
@@ -1259,6 +1330,9 @@ function renderProspectsSection(prospects) {
             ${STATUT_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === filtreStatut ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}
           </select>
           ${btnNouveau}${btnHorsCible}
+          <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
+          <button class="btn btn--ghost" onclick="ouvrirRafaleEnvoi()">Rafale : envoyer</button>
+          <button class="btn btn--ghost" onclick="ouvrirRafaleDecisions()">Rafale : décisions</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
           <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
         </div>
@@ -1275,16 +1349,31 @@ function renderProspectsTable(prospects) {
     if (p.statut === "Recontacter" || p.statut === "Pas maintenant") {
       const overdue = p.dateRappel && isOverdue(p.dateRappel);
       prochaineActionHtml = `<input class="note-input ${overdue ? "next-action--overdue" : ""}" type="date" value="${frDateToIso(p.dateRappel)}" data-action="update-field" data-champ="dateRappel">`;
-    } else if (RELANCE_STATUTS.indexOf(p.statut) !== -1) {
+    } else if (p.statut === "Première relance" || (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2)) {
+      // Une relance reste a envoyer (Statut = etape en attente). Une fois la
+      // 2e relance envoyee (nbRelances >= 2), on tombe dans DECISION_CONFIG
+      // ci-dessous pour le suivi J+7 "a decider" -- plus rien a envoyer ici.
       const relance = nextRelance(p);
       const overdue = relance && isOverdue(relance);
-      const nRelances = Number(p.nbRelances) || 0;
-      const btnRelance = nRelances < 2
-        ? `<div><button class="link-btn" data-action="marquer-relance" data-ligne="${p.ligne}">Relance envoyée</button></div>`
-        : "";
+      const btnRelance = `<div><button class="link-btn" data-action="marquer-relance" data-ligne="${p.ligne}">Relance envoyée</button></div>`;
       prochaineActionHtml = (relance
         ? `<span class="next-action ${overdue ? "next-action--overdue" : "muted"}">Relance ${escapeHtml(relance)}</span>`
         : `<span class="next-action muted">—</span>`) + btnRelance;
+    } else if (DECISION_CONFIG[p.statut]) {
+      const cfg = DECISION_CONFIG[p.statut];
+      const j = joursEcoules(p[cfg.dateChamp]);
+      if (j !== null && j >= cfg.delaiJours) {
+        const boutonsHtml = cfg.boutons.map(label => {
+          const statutCible = label === "Devient cliente" ? "Client" : label;
+          return `<button class="link-btn" data-action="classer-decision" data-ligne="${p.ligne}" data-statut="${escapeHtml(statutCible)}" data-nom="${escapeHtml(p.nom)}">${escapeHtml(label)}</button>`;
+        }).join(" ");
+        prochaineActionHtml = `<span class="next-action next-action--overdue">${escapeHtml(cfg.libelle(j))}</span>
+          <div>${boutonsHtml}</div>`;
+      } else if (j !== null) {
+        prochaineActionHtml = `<span class="next-action muted">Décision le ${escapeHtml(ajouterJoursFr(parseFrDate(p[cfg.dateChamp]), cfg.delaiJours))}</span>`;
+      } else {
+        prochaineActionHtml = `<span class="next-action muted">—</span>`;
+      }
     } else {
       prochaineActionHtml = `<span class="next-action muted">—</span>`;
     }
@@ -1295,7 +1384,7 @@ function renderProspectsTable(prospects) {
 
     const sousLignes = [p.lieu, p.age ? p.age + " ans" : ""].filter(Boolean).join(" · ");
     const lienBtn = p.lien ? `<a class="link-btn link-btn--accent" href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Profil →</a>` : "";
-    const messageBtn = `<button class="link-btn" data-action="copy-message" data-nom="${escapeHtml(p.nom)}" data-statut="${escapeHtml(p.statut || "")}">Copier msg</button>`;
+    const messageBtn = `<button class="link-btn" data-action="copy-message" data-nom="${escapeHtml(p.nom)}" data-statut="${escapeHtml(templateKeyPourEnvoi(p))}">Copier msg</button>`;
 
     return `
       <tr data-ligne="${p.ligne}">
@@ -1440,6 +1529,7 @@ function ajouterJoursFr(date, jours) {
 }
 async function updateField(ligne, champ, valeur) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
+  let basculerVersPremiereRelance = false;
   if (p) {
     p[champ] = coerceValeurLocale(champ, valeur);
     if (champ === "statut" && valeur === "Appel découverte") {
@@ -1450,6 +1540,17 @@ async function updateField(ligne, champ, valeur) {
       if (base) {
         p.relance1 = ajouterJoursFr(base, 5);
         p.relance2 = ajouterJoursFr(base, 12);
+      }
+      // Le Statut nomme l'etape EN ATTENTE, pas la derniere envoyee : des que le
+      // 1er message est enregistre, on passe direct a "Premiere relance" pour la
+      // distinguer visuellement d'un prospect jamais contacte -- sans quoi les
+      // deux restaient indiscernables sous "Nouveau" tant qu'aucune relance
+      // n'avait ete cliquee. Ne s'applique qu'au premier enregistrement (garde-fou
+      // nbRelances===0) pour ne pas retrograder un prospect deja plus avance si
+      // Marie corrige la date apres coup.
+      if (p.statut === "Nouveau" && (Number(p.nbRelances) || 0) === 0) {
+        p.statut = "Première relance";
+        basculerVersPremiereRelance = true;
       }
     }
     render(currentData);
@@ -1465,6 +1566,10 @@ async function updateField(ligne, champ, valeur) {
   if (!res || !res.ok) {
     alert("Échec de l'enregistrement : " + (res && res.erreur ? res.erreur : "erreur inconnue"));
     loadData(true);
+    return;
+  }
+  if (basculerVersPremiereRelance) {
+    await updateField(ligne, "statut", "Première relance");
   }
 }
 
@@ -1666,6 +1771,308 @@ async function submitAddClient() {
   loadData(true);
 }
 
+// ─── Mode rafale (envoi en serie sur les ~2500 abonnes) ───
+// Deux passes distinctes et volontairement separees (voir discussion avec
+// Marie) : la Rafale 1 (tri) classe rapidement les prospects "Nouveau"
+// ambigus (jamais contactes vs. deja contactes il y a des mois, avant que ce
+// suivi existe) sans jamais envoyer de message -- pas d'ambiguite possible
+// sur quel texte envoyer. La Rafale 2 (envoi) traite ensuite les prospects
+// dont le statut est deja fixe : un seul message possible par personne, copie
+// automatiquement, un clic pour passer au suivant.
+let rafaleMode = null; // "tri" | "envoi"
+let rafaleQueue = [];
+let rafaleIndex = 0;
+
+function dateToIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const j = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${j}`;
+}
+function dateFromIso(iso) {
+  const [y, m, j] = iso.split("-").map(Number);
+  return new Date(y, m - 1, j);
+}
+function copierTexte(texte) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texte).catch(() => prompt("Copie ce message :", texte));
+  } else {
+    prompt("Copie ce message :", texte);
+  }
+}
+function fermerRafale() {
+  document.getElementById("rafale-overlay").hidden = true;
+  rafaleMode = null;
+  rafaleQueue = [];
+}
+function rafalePrecedent() {
+  if (rafaleIndex > 0) rafaleIndex--;
+  if (rafaleMode === "tri") {
+    renderRafaleTriCard();
+  } else {
+    const p = rafaleQueue[rafaleIndex];
+    if (p && p.lien) window.open(p.lien, "_blank");
+    renderRafaleEnvoiCard();
+  }
+}
+function rafaleEnTeteHtml(p, total) {
+  return `
+    <div class="muted" style="margin-bottom:0.5rem;">${rafaleIndex + 1} / ${total}</div>
+    <h2 style="margin-bottom:0.25rem;">${escapeHtml(p.nom)}</h2>
+    <p class="muted" style="margin-bottom:1rem;">${escapeHtml(p.poste || "")}</p>
+    ${p.lien ? `<p style="margin-bottom:1rem;"><a href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Voir le profil LinkedIn ↗</a></p>` : `<p class="muted" style="margin-bottom:1rem;">Pas de lien LinkedIn enregistré.</p>`}
+  `;
+}
+
+// ─── Rafale 1 : tri des "Nouveau" ambigus ───
+
+function ouvrirRafaleTri() {
+  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau").slice().sort((a, b) => a.ligne - b.ligne);
+  if (rafaleQueue.length === 0) { alert("Rien à trier : aucun prospect en statut Nouveau."); return; }
+  rafaleMode = "tri";
+  rafaleIndex = 0;
+  document.getElementById("rafale-overlay").hidden = false;
+  renderRafaleTriCard();
+}
+function renderRafaleTriCard() {
+  const total = rafaleQueue.length;
+  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
+  if (rafaleIndex >= total) {
+    document.getElementById("rafale-content").innerHTML = `
+      <h2>Tri terminé</h2>
+      <p class="muted">${total} prospect${total > 1 ? "s" : ""} passé${total > 1 ? "s" : ""} en revue.</p>
+      <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
+    `;
+    return;
+  }
+  const p = rafaleQueue[rafaleIndex];
+  document.getElementById("rafale-content").innerHTML = `
+    ${rafaleEnTeteHtml(p, total)}
+    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+      <button class="btn" onclick="rafaleTriJamaisContacte()">1 · Jamais contacté</button>
+      <button class="btn btn--ghost" onclick="rafaleTriRepriseDeContact()">2 · Reprise de contact (ancien)</button>
+      <button class="btn btn--ghost" onclick="rafaleTriHorsCible()">3 · Hors cible</button>
+      <button class="btn btn--ghost" onclick="rafaleTriToggleForm()">4 · Déjà contacté récemment…</button>
+    </div>
+    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3 / 4, Retour arrière = précédent, Échap = quitter.</p>
+    <div id="rafale-deja-contacte-form" hidden style="margin-top:1.25rem;border-top:0.5px solid var(--border);padding-top:1.25rem;">
+      <p class="muted" style="margin-bottom:0.75rem;">Pour reprendre la séquence exacte là où elle s'est arrêtée (contact récent, quelques semaines) — pour un contact ancien, préfère plutôt "Reprise de contact" ci-dessus.</p>
+      <label>Étape déjà envoyée</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:0.75rem;">
+        <label style="text-transform:none;font-size:14px;font-weight:400;"><input type="radio" name="rafale-stage" value="1" checked> 1er message envoyé</label>
+        <label style="text-transform:none;font-size:14px;font-weight:400;"><input type="radio" name="rafale-stage" value="2"> 1ère relance envoyée</label>
+        <label style="text-transform:none;font-size:14px;font-weight:400;"><input type="radio" name="rafale-stage" value="3"> 2ème relance envoyée</label>
+      </div>
+      <label>Date d'envoi (de cette étape)</label>
+      <input type="date" id="rafale-date-contact" value="${dateToIso(new Date())}">
+      <div class="modal-actions">
+        <button class="btn btn--ghost" onclick="rafaleTriToggleForm()">Annuler</button>
+        <button class="btn" onclick="rafaleTriDejaContacteValider()">Valider et suivant</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:1.5rem;">
+      ${boutonPrecedent}
+      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter le tri</button>
+    </div>
+  `;
+}
+function rafaleTriToggleForm() {
+  const el = document.getElementById("rafale-deja-contacte-form");
+  el.hidden = !el.hidden;
+}
+async function rafaleTriJamaisContacte() {
+  // Rien a ecrire : l'etat par defaut ("Nouveau", pas de date 1er message) est deja correct.
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+async function rafaleTriHorsCible() {
+  const p = rafaleQueue[rafaleIndex];
+  p.statut = "Hors cible";
+  await updateField(p.ligne, "statut", "Hors cible");
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+async function rafaleTriRepriseDeContact() {
+  const p = rafaleQueue[rafaleIndex];
+  p.statut = "Reprise de contact";
+  await updateField(p.ligne, "statut", "Reprise de contact");
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+async function rafaleTriDejaContacteValider() {
+  const p = rafaleQueue[rafaleIndex];
+  const stageEl = document.querySelector('input[name="rafale-stage"]:checked');
+  const dateEl = document.getElementById("rafale-date-contact");
+  if (!stageEl || !dateEl.value) { alert("Choisis une étape et une date."); return; }
+  const offsets = { "1": 0, "2": 5, "3": 12 };
+  const off = offsets[stageEl.value];
+  const d = dateFromIso(dateEl.value);
+  d.setDate(d.getDate() - off);
+  const iso1erMessage = dateToIso(d);
+  const nbRelances = stageEl.value === "1" ? "0" : (stageEl.value === "2" ? "1" : "2");
+  const statut = stageEl.value === "1" ? "Nouveau" : (stageEl.value === "2" ? "Première relance" : "Deuxième relance");
+  // Ecrit directement les 3 champs (plutot que de rejouer updateField/date1erMessage
+  // qui forcerait toujours "Première relance") pour respecter l'etape choisie meme
+  // pour un rattrapage "2eme relance deja envoyee".
+  p.date1erMessage = isoDateToFr(iso1erMessage);
+  p.nbRelances = nbRelances;
+  p.statut = statut;
+  await updateField(p.ligne, "date1erMessage", iso1erMessage);
+  await updateField(p.ligne, "nbRelances", nbRelances);
+  await updateField(p.ligne, "statut", statut);
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+
+// ─── Rafale 2 : envoi des messages deja tries ───
+
+function ouvrirRafaleEnvoi() {
+  rafaleQueue = currentData.prospects.filter(p => {
+    if (p.statut === "Nouveau" && !p.date1erMessage) return true;
+    if (p.statut === "Première relance") return true;
+    if (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2) return true;
+    if (p.statut === "Reprise de contact") return true;
+    return false;
+  }).sort((a, b) => a.ligne - b.ligne);
+  if (rafaleQueue.length === 0) { alert("Rien à envoyer pour l'instant : aucun prospect avec un message en attente."); return; }
+  rafaleMode = "envoi";
+  rafaleIndex = 0;
+  document.getElementById("rafale-overlay").hidden = false;
+  if (rafaleQueue[0].lien) window.open(rafaleQueue[0].lien, "_blank");
+  renderRafaleEnvoiCard();
+}
+function renderRafaleEnvoiCard() {
+  const total = rafaleQueue.length;
+  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
+  if (rafaleIndex >= total) {
+    document.getElementById("rafale-content").innerHTML = `
+      <h2>Envoi terminé</h2>
+      <p class="muted">${total} message${total > 1 ? "s" : ""} traité${total > 1 ? "s" : ""}.</p>
+      <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
+    `;
+    return;
+  }
+  const p = rafaleQueue[rafaleIndex];
+  const cle = templateKeyPourEnvoi(p);
+  const template = messageTemplatesActuels()[cle] || "";
+  const prenom = (p.nom || "").split(" ")[0];
+  const texte = template.replace("{prenom}", prenom);
+  copierTexte(texte);
+  document.getElementById("rafale-content").innerHTML = `
+    ${rafaleEnTeteHtml(p, total)}
+    <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
+    <div class="modal-actions" style="justify-content:flex-start;">
+      <button class="btn" onclick="rafaleEnvoiSuivant()">Envoyé → suivant (Entrée)</button>
+    </div>
+    <p class="muted">Retour arrière = précédent, Échap = quitter.</p>
+    <div class="modal-actions" style="margin-top:1.5rem;">
+      ${boutonPrecedent}
+      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter l'envoi</button>
+    </div>
+  `;
+}
+async function rafaleEnvoiSuivant() {
+  const p = rafaleQueue[rafaleIndex];
+  // Ouvre tout de suite (dans le meme geste utilisateur que ce clic, avant tout
+  // await) le profil de la PROCHAINE personne : evite un clic supplementaire sur
+  // "Voir le profil LinkedIn" a chaque tour, et un ouverture apres un await
+  // risquerait d'etre bloquee par le navigateur (plus reconnue comme un geste utilisateur).
+  const suivant = rafaleQueue[rafaleIndex + 1];
+  if (suivant && suivant.lien) window.open(suivant.lien, "_blank");
+  if (p.statut === "Nouveau") {
+    await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
+  } else if (p.statut === "Reprise de contact") {
+    // Re-ecrit la meme valeur pour re-tamponner la colonne Y (Code.gs) a la
+    // date d'envoi REELLE, pas a la date du tri (voir ouvrirRafaleTri).
+    await updateField(p.ligne, "statut", "Reprise de contact");
+  } else {
+    await marquerRelanceEnvoyee(p.ligne);
+  }
+  rafaleIndex++;
+  renderRafaleEnvoiCard();
+}
+
+// ─── Rafale 3 : decisions en attente (memes cas que DECISION_CONFIG dans le
+// tableau Prospects, mais une personne a la fois plutot que dispersees parmi
+// 2472 lignes) ───
+
+function ouvrirRafaleDecisions() {
+  rafaleQueue = currentData.prospects.filter(estADecider).slice().sort((a, b) => dateUrgence(a) - dateUrgence(b));
+  if (rafaleQueue.length === 0) { alert("Rien à décider pour l'instant."); return; }
+  rafaleMode = "decisions";
+  rafaleIndex = 0;
+  document.getElementById("rafale-overlay").hidden = false;
+  renderRafaleDecisionCard();
+}
+function renderRafaleDecisionCard() {
+  const total = rafaleQueue.length;
+  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
+  if (rafaleIndex >= total) {
+    document.getElementById("rafale-content").innerHTML = `
+      <h2>Décisions terminées</h2>
+      <p class="muted">${total} prospect${total > 1 ? "s" : ""} traité${total > 1 ? "s" : ""}.</p>
+      <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
+    `;
+    return;
+  }
+  const p = rafaleQueue[rafaleIndex];
+  const cfg = DECISION_CONFIG[p.statut];
+  const j = joursEcoules(p[cfg.dateChamp]);
+  const boutonsHtml = cfg.boutons.map((label, i) => {
+    const statutCible = label === "Devient cliente" ? "Client" : label;
+    return `<button class="btn ${i === 0 ? "" : "btn--ghost"}" onclick="rafaleDecisionClasser('${statutCible.replace(/'/g, "\\'")}')">${i + 1} · ${escapeHtml(label)}</button>`;
+  }).join(" ");
+  document.getElementById("rafale-content").innerHTML = `
+    ${rafaleEnTeteHtml(p, total)}
+    <p class="muted" style="margin-bottom:1rem;">${escapeHtml(cfg.libelle(j))}</p>
+    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">${boutonsHtml}</div>
+    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1${cfg.boutons.length > 1 ? " / 2" : ""}${cfg.boutons.length > 2 ? " / 3" : ""}, Retour arrière = précédent, Échap = quitter.</p>
+    <div class="modal-actions" style="margin-top:1.5rem;">
+      ${boutonPrecedent}
+      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
+    </div>
+  `;
+}
+async function rafaleDecisionClasser(statutCible) {
+  const p = rafaleQueue[rafaleIndex];
+  if (statutCible === "Client") {
+    // Flux de conversion a part (formule/montant) -- on ferme la rafale plutot
+    // que d'empiler deux modales ; elle peut la rouvrir ensuite, cette personne
+    // aura disparu de la file (elle ne sera plus en Deuxieme relance/Reprise de
+    // contact/Appel decouverte).
+    fermerRafale();
+    openConvertModal(p.ligne, p.nom);
+    return;
+  }
+  await classerProspect(p.ligne, statutCible);
+  rafaleIndex++;
+  renderRafaleDecisionCard();
+}
+
+document.addEventListener("keydown", (e) => {
+  const overlay = document.getElementById("rafale-overlay");
+  if (!overlay || overlay.hidden) return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+  if (e.key === "Escape") { fermerRafale(); return; }
+  if (e.key === "Backspace") { e.preventDefault(); rafalePrecedent(); return; }
+  if (rafaleMode === "tri") {
+    if (e.key === "1") rafaleTriJamaisContacte();
+    else if (e.key === "2") rafaleTriRepriseDeContact();
+    else if (e.key === "3") rafaleTriHorsCible();
+    else if (e.key === "4") rafaleTriToggleForm();
+  } else if (rafaleMode === "envoi") {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rafaleEnvoiSuivant(); }
+  } else if (rafaleMode === "decisions") {
+    const p = rafaleQueue[rafaleIndex];
+    const cfg = p && DECISION_CONFIG[p.statut];
+    const idx = ["1", "2", "3"].indexOf(e.key);
+    if (cfg && idx !== -1 && cfg.boutons[idx]) {
+      const label = cfg.boutons[idx];
+      rafaleDecisionClasser(label === "Devient cliente" ? "Client" : label);
+    }
+  }
+});
+
 // ─── Popup de relance quotidienne (une fois par jour) ───
 
 function maybeShowReminderPopup(data) {
@@ -1675,6 +2082,7 @@ function maybeShowReminderPopup(data) {
   const relances = [];
   const recontacts = [];
   const connexionsAPurger = [];
+  const aDecider = [];
   for (const p of data.prospects) {
     const r = nextRelance(p);
     if (r && isOverdue(r)) relances.push(p);
@@ -1683,16 +2091,22 @@ function maybeShowReminderPopup(data) {
       const d = parseFrDate(p.dateAttenteConnexion);
       if (d && Math.round((today0() - d) / 86400000) >= 21) connexionsAPurger.push(p);
     }
+    if (estADecider(p)) aDecider.push(p);
   }
-  if (relances.length === 0 && recontacts.length === 0 && connexionsAPurger.length === 0) return;
+  if (relances.length === 0 && recontacts.length === 0 && connexionsAPurger.length === 0 && aDecider.length === 0) return;
 
   const relanceItems = relances.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Relance à envoyer</span></li>`).join("");
   const recontactItems = recontacts.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">A recontacter</span></li>`).join("");
   const connexionItems = connexionsAPurger.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Connexion en attente depuis 3+ semaines — à supprimer</span></li>`).join("");
+  const aDeciderItems = aDecider.map(p => {
+    const cfg = DECISION_CONFIG[p.statut];
+    const j = joursEcoules(p[cfg.dateChamp]);
+    return `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">${escapeHtml(cfg.libelle(j))}</span></li>`;
+  }).join("");
 
   document.getElementById("reminder-content").innerHTML = `
-    <h2>${relances.length + recontacts.length + connexionsAPurger.length} personne(s) nécessitent une action aujourd'hui</h2>
-    <ul class="reminder-list">${relanceItems}${recontactItems}${connexionItems}</ul>
+    <h2>${relances.length + recontacts.length + connexionsAPurger.length + aDecider.length} personne(s) nécessitent une action aujourd'hui</h2>
+    <ul class="reminder-list">${relanceItems}${recontactItems}${connexionItems}${aDeciderItems}</ul>
     <div class="modal-actions">
       <button class="btn" onclick="document.getElementById('reminder-overlay').hidden = true;">C'est noté</button>
     </div>
@@ -1763,6 +2177,10 @@ document.getElementById("app").addEventListener("click", (e) => {
   else if (el.dataset.action === "copy-message") copierMessage(nom, el.dataset.statut);
   else if (el.dataset.action === "copy-rappel") copierRappel(nom);
   else if (el.dataset.action === "marquer-relance") marquerRelanceEnvoyee(ligne);
+  else if (el.dataset.action === "classer-decision") {
+    if (el.dataset.statut === "Client") openConvertModal(ligne, nom);
+    else classerProspect(ligne, el.dataset.statut);
+  }
 });
 
 document.getElementById("lock-pwd").addEventListener("keydown", (e) => {
