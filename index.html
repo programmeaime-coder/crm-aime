@@ -62,6 +62,13 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .section__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.5px solid var(--border); }
 .section__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
 
+.rappels-relances-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 0.5px solid var(--border); }
+.rappels-relances-box { padding: 1.25rem 1.5rem; }
+.rappels-relances-box--relances { background: var(--bordeaux-pale); }
+.rappels-relances-box--rappels { background: var(--success-pale); }
+.rappels-relances-box__titre { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; margin-bottom: 0.35rem; }
+@media (max-width: 800px) { .rappels-relances-grid { grid-template-columns: 1fr; } }
+
 .btn { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 9px 18px; border: 0.5px solid var(--border); background: var(--bordeaux); color: #fff; cursor: pointer; }
 .btn:hover { opacity: 0.88; }
 .btn--ghost { background: #fff; color: var(--text); }
@@ -781,14 +788,19 @@ function rappelsADemainHtml(prospects, obj) {
       return diff === 1 || diff === 2;
     })
     .sort((a, b) => parseFrDate(a.dateAppelDecouverte) - parseFrDate(b.dateAppelDecouverte));
-  if (!matches.length) return `<p class="muted">Aucun appel découverte dans les 24-48h à venir.</p>`;
+  const aDecider = prospects.filter(p => p.statut === "Appel découverte" && estADecider(p));
+  if (!matches.length && !aDecider.length) return `<p class="muted">Rien pour l'instant.</p>`;
   const rows = matches.map(p => `
     <div class="rappel-item">
       <span><b>${escapeHtml(p.nom)}</b> — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
       <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
     </div>
   `).join("");
-  return `<div class="rappels-list">${rows}</div>`;
+  const rowsADecider = aDecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — appel tenu, à trancher</span></div>`).join("");
+  return `
+    ${matches.length ? `<div class="rappels-list">${rows}</div>` : `<p class="muted">Aucun appel découverte dans les 24-48h à venir.</p>`}
+    ${aDecider.length ? `<p class="muted" style="margin-top:0.75rem;">À trancher :</p><div class="rappels-list">${rowsADecider}</div>` : ""}
+  `;
 }
 // Simple aperçu (pas d'action ici) -- Marie traite les relances depuis
 // l'onglet Prospects, ou le lien profil et le tri sont deja sous les yeux.
@@ -1103,15 +1115,22 @@ function renderDashboard(data) {
     ${rappelVersementLiberatoireHtml()}
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Relances à envoyer aujourd'hui</span></div>
-      <p class="muted" style="margin-bottom:0.75rem;">Prospects dont la Relance 1 ou 2 est dépassée (colonne "Prochaine action" côté Prospects).</p>
-      ${relancesADemainHtml(data.prospects)}
-    </div>
-
-    <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Rappels à envoyer aujourd'hui</span></div>
-      <p class="muted" style="margin-bottom:0.75rem;">Appels découverte prévus dans les 24-48h (colonne "Appel découverte" côté Prospects).</p>
-      ${rappelsADemainHtml(data.prospects, obj)}
+      <div class="section__head">
+        <span class="section__eyebrow">Rappels & Relances</span>
+        <button class="btn" onclick="ouvrirRafaleActions()">Rafale : actions</button>
+      </div>
+      <div class="rappels-relances-grid">
+        <div class="rappels-relances-box rappels-relances-box--relances">
+          <div class="rappels-relances-box__titre">Relances</div>
+          <p class="muted" style="margin-bottom:0.75rem;">Prospects dont la Relance 1 ou 2 est dépassée.</p>
+          ${relancesADemainHtml(data.prospects)}
+        </div>
+        <div class="rappels-relances-box rappels-relances-box--rappels">
+          <div class="rappels-relances-box__titre">Rappels</div>
+          <p class="muted" style="margin-bottom:0.75rem;">Appels découverte à venir ou à trancher.</p>
+          ${rappelsADemainHtml(data.prospects, obj)}
+        </div>
+      </div>
     </div>
 
     <div class="section">
@@ -1331,8 +1350,6 @@ function renderProspectsSection(prospects) {
           </select>
           ${btnNouveau}${btnHorsCible}
           <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
-          <button class="btn btn--ghost" onclick="ouvrirRafaleEnvoi()">Rafale : envoyer</button>
-          <button class="btn btn--ghost" onclick="ouvrirRafaleDecisions()">Rafale : décisions</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
           <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
         </div>
@@ -1771,15 +1788,16 @@ async function submitAddClient() {
   loadData(true);
 }
 
-// ─── Mode rafale (envoi en serie sur les ~2500 abonnes) ───
-// Deux passes distinctes et volontairement separees (voir discussion avec
-// Marie) : la Rafale 1 (tri) classe rapidement les prospects "Nouveau"
-// ambigus (jamais contactes vs. deja contactes il y a des mois, avant que ce
-// suivi existe) sans jamais envoyer de message -- pas d'ambiguite possible
-// sur quel texte envoyer. La Rafale 2 (envoi) traite ensuite les prospects
-// dont le statut est deja fixe : un seul message possible par personne, copie
-// automatiquement, un clic pour passer au suivant.
-let rafaleMode = null; // "tri" | "envoi"
+// ─── Mode rafale (traitement en serie sur les ~2500 abonnes) ───
+// Deux ecrans distincts et volontairement separes (voir discussion avec
+// Marie) : la Rafale 1 (tri, depuis l'onglet Prospects) classe rapidement les
+// prospects "Nouveau" ambigus (jamais contactes vs. deja contactes il y a des
+// mois, avant que ce suivi existe) sans jamais envoyer de message -- pas
+// d'ambiguite possible sur quel texte envoyer. La Rafale 2 (actions, depuis
+// le tableau de bord) traite ensuite tout ce qui est actionnable aujourd'hui
+// -- envoi des messages en attente ET decisions J+7/J+1 -- en une seule file
+// triee par urgence, chaque carte adaptee a son type.
+let rafaleMode = null; // "tri" | "actions"
 let rafaleQueue = [];
 let rafaleIndex = 0;
 
@@ -1811,8 +1829,8 @@ function rafalePrecedent() {
     renderRafaleTriCard();
   } else {
     const p = rafaleQueue[rafaleIndex];
-    if (p && p.lien) window.open(p.lien, "_blank");
-    renderRafaleEnvoiCard();
+    if (p && !estCarteDecision(p) && p.lien) window.open(p.lien, "_blank");
+    renderRafaleActionCard();
   }
 }
 function rafaleEnTeteHtml(p, total) {
@@ -1924,129 +1942,123 @@ async function rafaleTriDejaContacteValider() {
   renderRafaleTriCard();
 }
 
-// ─── Rafale 2 : envoi des messages deja tries ───
+// ─── Rafale 2 : actions du jour (envoi des messages en attente + decisions
+// J+7/J+1) fusionnees en une seule file, triee par urgence -- une carte de
+// type "envoi" (message a copier, profil a ouvrir) ou "decision" (boutons de
+// classement) selon la personne. Accessible depuis le tableau de bord. ───
 
-function ouvrirRafaleEnvoi() {
-  rafaleQueue = currentData.prospects.filter(p => {
+function estCarteDecision(p) {
+  return estADecider(p);
+}
+function urgencePourActions(p) {
+  if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
+  const r = nextRelance(p);
+  if (r) return parseFrDate(r);
+  return today0(); // Nouveau jamais contacte / Reprise de contact jamais envoyee : pas de date naturelle
+}
+function rafaleActionsCandidats() {
+  return currentData.prospects.filter(p => {
+    if (estADecider(p)) return true;
     if (p.statut === "Nouveau" && !p.date1erMessage) return true;
     if (p.statut === "Première relance") return true;
     if (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2) return true;
-    if (p.statut === "Reprise de contact") return true;
+    if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
     return false;
-  }).sort((a, b) => a.ligne - b.ligne);
-  if (rafaleQueue.length === 0) { alert("Rien à envoyer pour l'instant : aucun prospect avec un message en attente."); return; }
-  rafaleMode = "envoi";
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+}
+function ouvrirRafaleActions() {
+  rafaleQueue = rafaleActionsCandidats();
+  if (rafaleQueue.length === 0) { alert("Rien à faire pour l'instant : tout est à jour."); return; }
+  rafaleMode = "actions";
   rafaleIndex = 0;
   document.getElementById("rafale-overlay").hidden = false;
-  if (rafaleQueue[0].lien) window.open(rafaleQueue[0].lien, "_blank");
-  renderRafaleEnvoiCard();
+  const premier = rafaleQueue[0];
+  if (!estCarteDecision(premier) && premier.lien) window.open(premier.lien, "_blank");
+  renderRafaleActionCard();
 }
-function renderRafaleEnvoiCard() {
+function renderRafaleActionCard() {
   const total = rafaleQueue.length;
   const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
   if (rafaleIndex >= total) {
     document.getElementById("rafale-content").innerHTML = `
-      <h2>Envoi terminé</h2>
-      <p class="muted">${total} message${total > 1 ? "s" : ""} traité${total > 1 ? "s" : ""}.</p>
-      <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
-    `;
-    return;
-  }
-  const p = rafaleQueue[rafaleIndex];
-  const cle = templateKeyPourEnvoi(p);
-  const template = messageTemplatesActuels()[cle] || "";
-  const prenom = (p.nom || "").split(" ")[0];
-  const texte = template.replace("{prenom}", prenom);
-  copierTexte(texte);
-  document.getElementById("rafale-content").innerHTML = `
-    ${rafaleEnTeteHtml(p, total)}
-    <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
-    <div class="modal-actions" style="justify-content:flex-start;">
-      <button class="btn" onclick="rafaleEnvoiSuivant()">Envoyé → suivant (Entrée)</button>
-    </div>
-    <p class="muted">Retour arrière = précédent, Échap = quitter.</p>
-    <div class="modal-actions" style="margin-top:1.5rem;">
-      ${boutonPrecedent}
-      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter l'envoi</button>
-    </div>
-  `;
-}
-async function rafaleEnvoiSuivant() {
-  const p = rafaleQueue[rafaleIndex];
-  // Ouvre tout de suite (dans le meme geste utilisateur que ce clic, avant tout
-  // await) le profil de la PROCHAINE personne : evite un clic supplementaire sur
-  // "Voir le profil LinkedIn" a chaque tour, et un ouverture apres un await
-  // risquerait d'etre bloquee par le navigateur (plus reconnue comme un geste utilisateur).
-  const suivant = rafaleQueue[rafaleIndex + 1];
-  if (suivant && suivant.lien) window.open(suivant.lien, "_blank");
-  if (p.statut === "Nouveau") {
-    await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
-  } else if (p.statut === "Reprise de contact") {
-    // Re-ecrit la meme valeur pour re-tamponner la colonne Y (Code.gs) a la
-    // date d'envoi REELLE, pas a la date du tri (voir ouvrirRafaleTri).
-    await updateField(p.ligne, "statut", "Reprise de contact");
-  } else {
-    await marquerRelanceEnvoyee(p.ligne);
-  }
-  rafaleIndex++;
-  renderRafaleEnvoiCard();
-}
-
-// ─── Rafale 3 : decisions en attente (memes cas que DECISION_CONFIG dans le
-// tableau Prospects, mais une personne a la fois plutot que dispersees parmi
-// 2472 lignes) ───
-
-function ouvrirRafaleDecisions() {
-  rafaleQueue = currentData.prospects.filter(estADecider).slice().sort((a, b) => dateUrgence(a) - dateUrgence(b));
-  if (rafaleQueue.length === 0) { alert("Rien à décider pour l'instant."); return; }
-  rafaleMode = "decisions";
-  rafaleIndex = 0;
-  document.getElementById("rafale-overlay").hidden = false;
-  renderRafaleDecisionCard();
-}
-function renderRafaleDecisionCard() {
-  const total = rafaleQueue.length;
-  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
-  if (rafaleIndex >= total) {
-    document.getElementById("rafale-content").innerHTML = `
-      <h2>Décisions terminées</h2>
+      <h2>Actions terminées</h2>
       <p class="muted">${total} prospect${total > 1 ? "s" : ""} traité${total > 1 ? "s" : ""}.</p>
       <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
     `;
     return;
   }
   const p = rafaleQueue[rafaleIndex];
-  const cfg = DECISION_CONFIG[p.statut];
-  const j = joursEcoules(p[cfg.dateChamp]);
-  const boutonsHtml = cfg.boutons.map((label, i) => {
-    const statutCible = label === "Devient cliente" ? "Client" : label;
-    return `<button class="btn ${i === 0 ? "" : "btn--ghost"}" onclick="rafaleDecisionClasser('${statutCible.replace(/'/g, "\\'")}')">${i + 1} · ${escapeHtml(label)}</button>`;
-  }).join(" ");
-  document.getElementById("rafale-content").innerHTML = `
-    ${rafaleEnTeteHtml(p, total)}
-    <p class="muted" style="margin-bottom:1rem;">${escapeHtml(cfg.libelle(j))}</p>
-    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">${boutonsHtml}</div>
-    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1${cfg.boutons.length > 1 ? " / 2" : ""}${cfg.boutons.length > 2 ? " / 3" : ""}, Retour arrière = précédent, Échap = quitter.</p>
-    <div class="modal-actions" style="margin-top:1.5rem;">
-      ${boutonPrecedent}
-      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
-    </div>
-  `;
+  if (estCarteDecision(p)) {
+    const cfg = DECISION_CONFIG[p.statut];
+    const j = joursEcoules(p[cfg.dateChamp]);
+    const boutonsHtml = cfg.boutons.map((label, i) => {
+      const statutCible = label === "Devient cliente" ? "Client" : label;
+      return `<button class="btn ${i === 0 ? "" : "btn--ghost"}" onclick="rafaleActionsDecisionClasser('${statutCible.replace(/'/g, "\\'")}')">${i + 1} · ${escapeHtml(label)}</button>`;
+    }).join(" ");
+    document.getElementById("rafale-content").innerHTML = `
+      ${rafaleEnTeteHtml(p, total)}
+      <p class="muted" style="margin-bottom:1rem;">${escapeHtml(cfg.libelle(j))}</p>
+      <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">${boutonsHtml}</div>
+      <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1${cfg.boutons.length > 1 ? " / 2" : ""}${cfg.boutons.length > 2 ? " / 3" : ""}, Retour arrière = précédent, Échap = quitter.</p>
+      <div class="modal-actions" style="margin-top:1.5rem;">
+        ${boutonPrecedent}
+        <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
+      </div>
+    `;
+  } else {
+    const cle = templateKeyPourEnvoi(p);
+    const template = messageTemplatesActuels()[cle] || "";
+    const prenom = (p.nom || "").split(" ")[0];
+    const texte = template.replace("{prenom}", prenom);
+    copierTexte(texte);
+    document.getElementById("rafale-content").innerHTML = `
+      ${rafaleEnTeteHtml(p, total)}
+      <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
+      <div class="modal-actions" style="justify-content:flex-start;">
+        <button class="btn" onclick="rafaleActionsEnvoyerSuivant()">Envoyé → suivant (Entrée)</button>
+      </div>
+      <p class="muted">Retour arrière = précédent, Échap = quitter.</p>
+      <div class="modal-actions" style="margin-top:1.5rem;">
+        ${boutonPrecedent}
+        <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
+      </div>
+    `;
+  }
 }
-async function rafaleDecisionClasser(statutCible) {
+async function rafaleActionsEnvoyerSuivant() {
+  const p = rafaleQueue[rafaleIndex];
+  // Ouvre tout de suite (dans le meme geste utilisateur que ce clic, avant tout
+  // await) le profil de la PROCHAINE personne si elle aussi est de type "envoi" --
+  // evite un clic supplementaire sur "Voir le profil LinkedIn" a chaque tour, et
+  // une ouverture apres un await risquerait d'etre bloquee par le navigateur.
+  const suivant = rafaleQueue[rafaleIndex + 1];
+  if (suivant && !estCarteDecision(suivant) && suivant.lien) window.open(suivant.lien, "_blank");
+  if (p.statut === "Nouveau" || p.statut === "Reprise de contact") {
+    // Reprise de contact : ecrit Date 1er message (jamais utilisee pour cette
+    // etape sinon) plutot que de re-ecrire le Statut -- Code.gs s'en sert pour
+    // tamponner la colonne Y a la date d'envoi REELLE (pas la date du tri), et
+    // ca sert aussi de marqueur "deja envoye" pour ne plus le re-proposer ici
+    // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
+    await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
+  } else {
+    await marquerRelanceEnvoyee(p.ligne);
+  }
+  rafaleIndex++;
+  renderRafaleActionCard();
+}
+async function rafaleActionsDecisionClasser(statutCible) {
   const p = rafaleQueue[rafaleIndex];
   if (statutCible === "Client") {
     // Flux de conversion a part (formule/montant) -- on ferme la rafale plutot
     // que d'empiler deux modales ; elle peut la rouvrir ensuite, cette personne
-    // aura disparu de la file (elle ne sera plus en Deuxieme relance/Reprise de
-    // contact/Appel decouverte).
+    // aura disparu de la file.
     fermerRafale();
     openConvertModal(p.ligne, p.nom);
     return;
   }
   await classerProspect(p.ligne, statutCible);
   rafaleIndex++;
-  renderRafaleDecisionCard();
+  renderRafaleActionCard();
 }
 
 document.addEventListener("keydown", (e) => {
@@ -2060,15 +2072,19 @@ document.addEventListener("keydown", (e) => {
     else if (e.key === "2") rafaleTriRepriseDeContact();
     else if (e.key === "3") rafaleTriHorsCible();
     else if (e.key === "4") rafaleTriToggleForm();
-  } else if (rafaleMode === "envoi") {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rafaleEnvoiSuivant(); }
-  } else if (rafaleMode === "decisions") {
+  } else if (rafaleMode === "actions") {
     const p = rafaleQueue[rafaleIndex];
-    const cfg = p && DECISION_CONFIG[p.statut];
-    const idx = ["1", "2", "3"].indexOf(e.key);
-    if (cfg && idx !== -1 && cfg.boutons[idx]) {
-      const label = cfg.boutons[idx];
-      rafaleDecisionClasser(label === "Devient cliente" ? "Client" : label);
+    if (!p) return;
+    if (estCarteDecision(p)) {
+      const cfg = DECISION_CONFIG[p.statut];
+      const idx = ["1", "2", "3"].indexOf(e.key);
+      if (idx !== -1 && cfg.boutons[idx]) {
+        const label = cfg.boutons[idx];
+        rafaleActionsDecisionClasser(label === "Devient cliente" ? "Client" : label);
+      }
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      rafaleActionsEnvoyerSuivant();
     }
   }
 });
