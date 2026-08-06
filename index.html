@@ -1972,7 +1972,13 @@ async function rafaleTriEtapeValider() {
   d.setDate(d.getDate() - off);
   const iso1erMessage = dateToIso(d);
   const nbRelances = rafaleTriStage === "1" ? "0" : (rafaleTriStage === "2" ? "1" : "2");
-  const statut = rafaleTriStage === "1" ? "Nouveau" : (rafaleTriStage === "2" ? "Première relance" : "Deuxième relance");
+  // Le Statut nomme toujours l'etape EN ATTENTE (voir updateField/date1erMessage et
+  // marquerRelanceEnvoyee) : "1er message envoyé" = en attente de la 1ere relance
+  // -> "Première relance" ; "1ere ou 2e relance envoyée" = en attente de la 2e
+  // relance ou de la decision J+7 -> "Deuxième relance" dans les deux cas (jamais
+  // "Nouveau" ni "Première relance" pour ces deux etapes, sinon la relance ne se
+  // calcule plus -- voir nextRelance).
+  const statut = rafaleTriStage === "1" ? "Première relance" : "Deuxième relance";
   // Ecrit directement les 3 champs (plutot que de rejouer updateField/date1erMessage
   // qui forcerait toujours "Première relance") pour respecter l'etape choisie meme
   // pour un rattrapage "2eme relance deja envoyee".
