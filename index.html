@@ -85,6 +85,8 @@ td { padding: 0.85rem 0.75rem; border-bottom: 0.5px solid var(--border); font-si
 .table-compact td { padding: 0.35rem 0.5rem; font-size: 12px; }
 tr:last-child td { border-bottom: none; }
 .name-cell { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; }
+.name-cell--link { cursor: pointer; }
+.name-cell--link:hover { text-decoration: underline; }
 .muted { color: var(--text-muted); font-size: 12.5px; }
 .empty-msg { padding: 2rem 0.75rem; color: var(--text-muted); font-size: 13px; text-align: center; }
 
@@ -1437,7 +1439,7 @@ function renderProspectsTable(prospects) {
 
     return `
       <tr data-ligne="${p.ligne}">
-        <td data-label="Nom"><div class="name-cell">${escapeHtml(p.nom)}</div>${sousLignes ? `<div class="muted">${escapeHtml(sousLignes)}</div>` : ""}</td>
+        <td data-label="Nom"><div class="name-cell name-cell--link" onclick="openHistoriqueModal(${p.ligne})" title="Voir la fiche historique">${escapeHtml(p.nom)}</div>${sousLignes ? `<div class="muted">${escapeHtml(sousLignes)}</div>` : ""}</td>
         <td data-label="Poste"><input class="note-input" value="${escapeHtml(p.poste || "")}" placeholder="—" data-action="update-field" data-champ="poste"></td>
         <td data-label="LinkedIn"><div class="row-actions" style="justify-content:flex-start;">${lienBtn}${messageBtn}</div></td>
         <td data-label="Canal"><select class="note-input" data-action="update-field" data-champ="canal">${canalOptionsHtml(p.canal)}</select></td>
@@ -1664,6 +1666,47 @@ function closeModal() {
     pendingRevertSelect.value = pendingRevertSelect.dataset.prev || "";
     pendingRevertSelect = null;
   }
+}
+
+// Fiche historique : recompile les dates deja presentes sur la fiche (aucune
+// nouvelle donnee stockee) en frise chronologique, + le champ Note existant
+// (partage avec la colonne Note du tableau, pas un journal separe par
+// evenement -- volontairement facultatif, voir discussion avec Marie).
+function openHistoriqueModal(ligne) {
+  const p = currentData.prospects.find(x => x.ligne === ligne);
+  if (!p) return;
+  const evenements = [];
+  if (p.dateAppelDecouverte) evenements.push({ label: "Appel découverte", date: p.dateAppelDecouverte });
+  if (p.date1erMessage) evenements.push({ label: "1er message", date: p.date1erMessage });
+  const n = Number(p.nbRelances) || 0;
+  if (n >= 1 && p.relance1) evenements.push({ label: "Première relance", date: p.relance1 });
+  if (n >= 2 && p.relance2) evenements.push({ label: "Deuxième relance", date: p.relance2 });
+  if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel) {
+    evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel });
+  }
+  evenements.sort((a, b) => (parseFrDate(a.date) || 0) - (parseFrDate(b.date) || 0));
+
+  const listeHtml = evenements.length
+    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.label)}</b> — ${escapeHtml(ev.date)}</li>`).join("")}</ul>`
+    : `<p class="muted">Aucun événement daté pour le moment.</p>`;
+
+  document.getElementById("modal-content").innerHTML = `
+    <h2>${escapeHtml(p.nom)}</h2>
+    <p class="muted" style="margin-bottom:1rem;">${escapeHtml(p.poste || "")} — statut actuel : ${escapeHtml(p.statut || "—")}</p>
+    ${listeHtml}
+    <label style="margin-top:1rem;">Note</label>
+    <textarea id="m-historique-note" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Pas besoin de la remplir à chaque fois...">${escapeHtml(p.note || "")}</textarea>
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Fermer</button>
+      <button class="btn" onclick="submitHistoriqueNote(${ligne})">Enregistrer la note</button>
+    </div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitHistoriqueNote(ligne) {
+  const valeur = document.getElementById("m-historique-note").value;
+  await updateField(ligne, "note", valeur);
+  closeModal();
 }
 
 function openAddProspectModal() {
