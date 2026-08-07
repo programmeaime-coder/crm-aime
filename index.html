@@ -2004,9 +2004,22 @@ async function rafaleTriEtapeValider() {
   p.date1erMessage = isoDateToFr(iso1erMessage);
   p.nbRelances = nbRelances;
   p.statut = statut;
-  await updateField(p.ligne, "date1erMessage", iso1erMessage);
-  await updateField(p.ligne, "nbRelances", nbRelances);
-  await updateField(p.ligne, "statut", statut);
+  // Un seul appel (action dediee cote Code.gs) plutot que 3 updateField
+  // sequentiels -- ce clic etait sensiblement plus lent que les autres
+  // boutons de la Rafale, qui n'en font qu'un.
+  let res;
+  try {
+    res = await jsonpCall({ action: "updateProspectDejaContacte", ligne: p.ligne, date1erMessage: iso1erMessage, nbRelances, statut });
+  } catch (err) {
+    alert("Échec de l'enregistrement (connexion). Réessaie.");
+    loadData(true);
+    return;
+  }
+  if (!res || !res.ok) {
+    alert("Échec de l'enregistrement : " + (res && res.erreur ? res.erreur : "erreur inconnue"));
+    loadData(true);
+    return;
+  }
   rafaleTriStage = null;
   rafaleIndex++;
   renderRafaleTriCard();
