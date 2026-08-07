@@ -1906,14 +1906,16 @@ function renderRafaleTriCard() {
       <button class="btn" onclick="rafaleTriJamaisContacte()">1 · Jamais contacté</button>
       <button class="btn btn--ghost" onclick="rafaleTriRepriseDeContact()">2 · Reprise de contact (ancien)</button>
       <button class="btn btn--ghost" onclick="rafaleTriHorsCible()">3 · Hors cible</button>
+      <button class="btn btn--ghost" onclick="rafaleTriPasMaintenant()">4 · Pas maintenant</button>
+      <button class="btn btn--ghost" onclick="rafaleTriEnAttenteConnexion()">5 · En attente de connexion</button>
     </div>
     <p class="muted" style="margin-top:1rem;margin-bottom:0.5rem;">Déjà contacté récemment (reprend la séquence en cours) :</p>
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
-      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('1')">4 · Premier message envoyé</button>
-      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('2')">5 · Première relance envoyée</button>
-      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('3')">6 · Deuxième relance envoyée</button>
+      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('1')">6 · Premier message envoyé</button>
+      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('2')">7 · Première relance envoyée</button>
+      <button class="btn btn--ghost" onclick="rafaleTriOuvrirEtape('3')">8 · Deuxième relance envoyée</button>
     </div>
-    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3 / 4 / 5 / 6, Retour arrière = précédent, Échap = quitter.</p>
+    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 à 8, Retour arrière = précédent, Échap = quitter.</p>
     <div id="rafale-etape-form" hidden style="margin-top:1.25rem;border-top:0.5px solid var(--border);padding-top:1.25rem;">
       <label id="rafale-etape-label">Date d'envoi</label>
       <input type="date" id="rafale-date-contact" value="${dateToIso(new Date())}">
@@ -1959,6 +1961,23 @@ async function rafaleTriRepriseDeContact() {
   const p = rafaleQueue[rafaleIndex];
   p.statut = "Reprise de contact";
   await updateField(p.ligne, "statut", "Reprise de contact");
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+async function rafaleTriPasMaintenant() {
+  const p = rafaleQueue[rafaleIndex];
+  p.statut = "Pas maintenant";
+  await updateField(p.ligne, "statut", "Pas maintenant");
+  rafaleIndex++;
+  renderRafaleTriCard();
+}
+async function rafaleTriEnAttenteConnexion() {
+  const p = rafaleQueue[rafaleIndex];
+  p.statut = "En attente de connexion";
+  // Code.gs tamponne automatiquement la date du jour (colonne V) des que ce
+  // statut est ecrit -- meme mecanisme que le changement de statut normal
+  // depuis le tableau Prospects, voir mettreAJourProspect.
+  await updateField(p.ligne, "statut", "En attente de connexion");
   rafaleIndex++;
   renderRafaleTriCard();
 }
@@ -2134,9 +2153,11 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "1") rafaleTriJamaisContacte();
     else if (e.key === "2") rafaleTriRepriseDeContact();
     else if (e.key === "3") rafaleTriHorsCible();
-    else if (e.key === "4") rafaleTriOuvrirEtape("1");
-    else if (e.key === "5") rafaleTriOuvrirEtape("2");
-    else if (e.key === "6") rafaleTriOuvrirEtape("3");
+    else if (e.key === "4") rafaleTriPasMaintenant();
+    else if (e.key === "5") rafaleTriEnAttenteConnexion();
+    else if (e.key === "6") rafaleTriOuvrirEtape("1");
+    else if (e.key === "7") rafaleTriOuvrirEtape("2");
+    else if (e.key === "8") rafaleTriOuvrirEtape("3");
   } else if (rafaleMode === "actions") {
     const p = rafaleQueue[rafaleIndex];
     if (!p) return;
