@@ -1698,7 +1698,7 @@ function openHistoriqueModal(ligne) {
     <p class="muted" style="margin-bottom:1rem;">${escapeHtml(p.poste || "")} — statut actuel : ${escapeHtml(p.statut || "—")}</p>
     ${listeHtml}
     <label style="margin-top:1rem;">Note</label>
-    <textarea id="m-historique-note" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Pas besoin de la remplir à chaque fois...">${escapeHtml(p.note || "")}</textarea>
+    <textarea id="m-historique-note" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Les points importants...">${escapeHtml(p.note || "")}</textarea>
     <div class="modal-actions">
       <button class="btn btn--ghost" onclick="closeModal()">Fermer</button>
       <button class="btn" onclick="submitHistoriqueNote(${ligne})">Enregistrer la note</button>
