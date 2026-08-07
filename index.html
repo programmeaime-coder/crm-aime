@@ -1927,7 +1927,11 @@ function rafaleEnTeteHtml(p, total) {
 // ─── Rafale 1 : tri des "Nouveau" ambigus ───
 
 function ouvrirRafaleTri() {
-  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau").slice().sort((a, b) => a.ligne - b.ligne);
+  // !p.trieRafale exclut les "Jamais contacté" deja confirmes lors d'une
+  // session precedente -- ce bouton ne change pas le Statut (voir
+  // rafaleTriJamaisContacte), donc sans ce marqueur ils reapparaitraient a
+  // chaque reouverture de Rafale : trier.
+  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.trieRafale).slice().sort((a, b) => a.ligne - b.ligne);
   if (rafaleQueue.length === 0) { alert("Rien à trier : aucun prospect en statut Nouveau."); return; }
   rafaleMode = "tri";
   rafaleIndex = 0;
@@ -1992,7 +1996,13 @@ function rafaleTriFermerEtape() {
   rafaleTriStage = null;
 }
 async function rafaleTriJamaisContacte() {
-  // Rien a ecrire : l'etat par defaut ("Nouveau", pas de date 1er message) est deja correct.
+  // Le Statut/Date 1er message restent inchanges (l'etat par defaut est deja
+  // correct pour un vrai jamais-contacte -- il doit rester "Nouveau" sans
+  // date pour etre repris plus tard par Rafale : premiers messages). Seul
+  // le marqueur trieRafale est ecrit, pour ne plus le representer ici.
+  const p = rafaleQueue[rafaleIndex];
+  p.trieRafale = "1";
+  await updateField(p.ligne, "trieRafale", "1");
   rafaleIndex++;
   renderRafaleTriCard();
 }
