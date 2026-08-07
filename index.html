@@ -503,7 +503,10 @@ function jsonpCall(params) {
     const query = new URLSearchParams({ ...params, pwd: getStoredPassword(), callback: name }).toString();
     script.src = APPS_SCRIPT_URL + "?" + query;
     document.body.appendChild(script);
-    setTimeout(() => { if (!done) { reject(new Error("Delai depasse")); cleanup(); } }, 15000);
+    // 30s (au lieu de 15s) : "action=list" seul peut prendre 15-20s avec 2300+
+    // prospects (chaque ligne recalcule ses dates de relance cote Apps Script),
+    // le delai precedent coupait parfois la connexion avant la reponse.
+    setTimeout(() => { if (!done) { reject(new Error("Delai depasse")); cleanup(); } }, 30000);
   });
 }
 
