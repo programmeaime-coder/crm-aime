@@ -1280,8 +1280,24 @@ const STATUT_PRIORITE = [
 
 let prospectSort = null; // { champ: 'statut' | 'temperature', dir: 1 | -1 }
 
+// Date d'ajout la plus recente en premier -- utilise pour que les nouveaux
+// abonnes captes au fil de l'eau remontent devant le stock plus ancien de
+// "Nouveau", au lieu de s'empiler tout en bas derriere des milliers de
+// profils deja en attente. Tri stable : le tres gros lot importe le
+// 03/08/2026 partage tous la meme Date d'ajout, donc ce tri les laisse
+// intacts entre eux (ordre d'origine du fichier, deja voulu) et ne fait
+// bouger que les nouveaux ajouts avec une date plus recente.
+function comparerDateAjoutDesc(a, b) {
+  const da = parseFrDate(a.dateAjout);
+  const db = parseFrDate(b.dateAjout);
+  if (da && db) return db - da;
+  if (da) return -1;
+  if (db) return 1;
+  return 0;
+}
+
 function sortProspects(list) {
-  const copie = list.slice();
+  const copie = list.slice().sort(comparerDateAjoutDesc);
   if (!prospectSort) {
     copie.sort((a, b) => {
       const ia = STATUT_PRIORITE.indexOf(a.statut || "");
@@ -1945,7 +1961,7 @@ function ouvrirRafaleTri() {
   // session precedente -- ce bouton ne change pas le Statut (voir
   // rafaleTriJamaisContacte), donc sans ce marqueur ils reapparaitraient a
   // chaque reouverture de Rafale : trier.
-  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.trieRafale).slice().sort((a, b) => a.ligne - b.ligne);
+  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.trieRafale).slice().sort(comparerDateAjoutDesc);
   if (rafaleQueue.length === 0) { alert("Rien à trier : aucun prospect en statut Nouveau."); return; }
   rafaleMode = "tri";
   rafaleIndex = 0;
@@ -2123,7 +2139,7 @@ function rafaleActionsCandidats() {
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 }
 function ouvrirRafalePremiersMessages() {
-  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).slice().sort((a, b) => a.ligne - b.ligne);
+  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).slice().sort(comparerDateAjoutDesc);
   if (rafaleQueue.length === 0) { alert("Rien à envoyer : aucun prospect Nouveau jamais contacté."); return; }
   rafaleMode = "actions";
   rafaleIndex = 0;
