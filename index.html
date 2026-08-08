@@ -1980,6 +1980,10 @@ function renderRafaleTriCard() {
     return;
   }
   const p = rafaleQueue[rafaleIndex];
+  // Ouvre le profil automatiquement a chaque carte, comme Rafale : actions --
+  // evite un clic manuel sur "Voir le profil LinkedIn" pour chacun des ~1900
+  // profils a trier.
+  if (p.lien) window.open(p.lien, "_blank");
   document.getElementById("rafale-content").innerHTML = `
     ${rafaleEnTeteHtml(p, total)}
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
