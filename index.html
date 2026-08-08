@@ -1941,7 +1941,7 @@ function rafalePrecedent() {
     renderRafaleTriCard();
   } else {
     const p = rafaleQueue[rafaleIndex];
-    if (p && !estCarteDecision(p) && p.lien) window.open(p.lien, "_blank");
+    preparerActionEnvoi(p);
     renderRafaleActionCard();
   }
 }
@@ -2123,6 +2123,23 @@ async function rafaleTriEtapeValider() {
 function estCarteDecision(p) {
   return estADecider(p);
 }
+// Copie le message PUIS ouvre le profil, dans cet ordre et avant tout await --
+// window.open() deplace le focus vers le nouvel onglet, et
+// navigator.clipboard.writeText() echoue silencieusement ("Document is not
+// focused") des que le focus a quitte cet onglet CRM, laissant le
+// presse-papier bloque sur le message du contact precedent SANS aucune erreur
+// visible (l'etiquette "Message copie" s'affichait quand meme, a tort). Bug
+// constate en usage le 08/08/2026 (message de Premiere relance colle a la
+// place de la Deuxieme relance attendue). Doit rester appelee de facon
+// synchrone, avant le moindre await, pour ne pas se faire bloquer comme popup.
+function preparerActionEnvoi(p) {
+  if (!p || estCarteDecision(p)) return;
+  const cle = templateKeyPourEnvoi(p);
+  const template = messageTemplatesActuels()[cle] || "";
+  const prenom = (p.nom || "").split(" ")[0];
+  copierTexte(template.replace("{prenom}", prenom));
+  if (p.lien) window.open(p.lien, "_blank");
+}
 function urgencePourActions(p) {
   if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
   const r = nextRelance(p);
@@ -2148,7 +2165,7 @@ function ouvrirRafalePremiersMessages() {
   rafaleMode = "actions";
   rafaleIndex = 0;
   document.getElementById("rafale-overlay").hidden = false;
-  if (rafaleQueue[0].lien) window.open(rafaleQueue[0].lien, "_blank");
+  preparerActionEnvoi(rafaleQueue[0]);
   renderRafaleActionCard();
 }
 function ouvrirRafaleActions() {
@@ -2157,8 +2174,7 @@ function ouvrirRafaleActions() {
   rafaleMode = "actions";
   rafaleIndex = 0;
   document.getElementById("rafale-overlay").hidden = false;
-  const premier = rafaleQueue[0];
-  if (!estCarteDecision(premier) && premier.lien) window.open(premier.lien, "_blank");
+  preparerActionEnvoi(rafaleQueue[0]);
   renderRafaleActionCard();
 }
 function renderRafaleActionCard() {
@@ -2191,11 +2207,11 @@ function renderRafaleActionCard() {
       </div>
     `;
   } else {
+    // Le message a deja ete copie et le profil ouvert par preparerActionEnvoi()
+    // (appelee plus haut, avant tout await, par l'appelant) -- refaire la copie
+    // ici echouerait silencieusement, le focus ayant deja quitte cet onglet
+    // depuis l'ouverture du profil.
     const cle = templateKeyPourEnvoi(p);
-    const template = messageTemplatesActuels()[cle] || "";
-    const prenom = (p.nom || "").split(" ")[0];
-    const texte = template.replace("{prenom}", prenom);
-    copierTexte(texte);
     document.getElementById("rafale-content").innerHTML = `
       ${rafaleEnTeteHtml(p, total)}
       <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
@@ -2212,12 +2228,13 @@ function renderRafaleActionCard() {
 }
 async function rafaleActionsEnvoyerSuivant() {
   const p = rafaleQueue[rafaleIndex];
-  // Ouvre tout de suite (dans le meme geste utilisateur que ce clic, avant tout
-  // await) le profil de la PROCHAINE personne si elle aussi est de type "envoi" --
-  // evite un clic supplementaire sur "Voir le profil LinkedIn" a chaque tour, et
-  // une ouverture apres un await risquerait d'etre bloquee par le navigateur.
+  // Copie le message et ouvre le profil de la PROCHAINE personne tout de suite
+  // (dans le meme geste utilisateur que ce clic, avant tout await) via
+  // preparerActionEnvoi() -- evite un clic supplementaire sur "Voir le profil
+  // LinkedIn", et une ouverture apres un await risquerait d'etre bloquee par
+  // le navigateur comme popup.
   const suivant = rafaleQueue[rafaleIndex + 1];
-  if (suivant && !estCarteDecision(suivant) && suivant.lien) window.open(suivant.lien, "_blank");
+  preparerActionEnvoi(suivant);
   if (p.statut === "Nouveau" || p.statut === "Reprise de contact") {
     // Reprise de contact : ecrit Date 1er message (jamais utilisee pour cette
     // etape sinon) plutot que de re-ecrire le Statut -- Code.gs s'en sert pour
