@@ -128,6 +128,7 @@ select.statut-select:focus { outline: 1.5px solid var(--bordeaux); }
 .st-client { background: var(--success-pale); color: var(--success); }
 .st-recontact { background: #eef1f6; color: #5b6b85; }
 .st-non { background: #f0f0f0; color: #999; }
+.st-a-traiter { background: #fdf0d5; color: #a5690a; }
 
 select.temp-select {
   font-family: 'DM Sans', sans-serif;
@@ -388,11 +389,12 @@ Marie 🌞`
 };
 
 const STATUT_OPTIONS = [
-  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation",
+  "Nouveau", "À traiter", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation",
   "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter"
 ];
 const STATUT_CLASS = {
   "Nouveau": "st-neutral",
+  "À traiter": "st-a-traiter",
   "En attente de connexion": "st-connexion",
   "Reprise de contact": "st-reprise",
   "Première relance": "st-r1",
@@ -1261,15 +1263,16 @@ async function submitObjectifs() {
 
 let afficherNouveau = false;
 let afficherHorsCible = false;
+let afficherATraiter = false;
 let filtreStatut = "";
-const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant"];
+const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant", "À traiter"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // Hierarchie d'attention par defaut (sans clic sur "trier") : ce que Marie doit
 // voir tous les jours remonte, ce qui ne demande pas d'action reste discret en
 // bas. Distincte de STATUT_ORDER (l'ordre du pipeline, utilise seulement quand
 // elle clique explicitement sur l'en-tete "Statut").
-// "Hors cible" et "Pas maintenant" sont geres a part (toujours relegues en bas,
-// voir renderProspectsSection) -- pas besoin d'eux ici.
+// "Hors cible", "Pas maintenant" et "À traiter" sont geres a part (toujours
+// relegues en bas, voir renderProspectsSection) -- pas besoin d'eux ici.
 const STATUT_PRIORITE = [
   "Appel découverte", "En attente de paiement",
   "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Client"
@@ -1317,6 +1320,10 @@ function toggleAfficherHorsCible() {
   afficherHorsCible = !afficherHorsCible;
   render(currentData);
 }
+function toggleAfficherATraiter() {
+  afficherATraiter = !afficherATraiter;
+  render(currentData);
+}
 function onFiltreStatutChange(select) {
   filtreStatut = select.value;
   render(currentData);
@@ -1339,8 +1346,9 @@ function renderProspectsSection(prospects) {
   const rechercheNorm = normaliserTexte(rechercheTexte);
   const nbNouveau = prospects.filter(p => p.statut === "Nouveau").length;
   const nbHorsCible = prospects.filter(p => p.statut === "Hors cible").length;
-  // Une recherche active ignore les bascules Nouveau/Hors cible : l'objectif est de
-  // verifier si quelqu'un est deja connu quelque part dans le CRM, pas de parcourir.
+  const nbATraiter = prospects.filter(p => p.statut === "À traiter").length;
+  // Une recherche active ignore les bascules Nouveau/Hors cible/A traiter : l'objectif
+  // est de verifier si quelqu'un est deja connu quelque part dans le CRM, pas de parcourir.
   const visibles = rechercheActive
     ? prospects.filter(p => normaliserTexte(p.nom).indexOf(rechercheNorm) !== -1)
     : filtreStatut
@@ -1348,30 +1356,36 @@ function renderProspectsSection(prospects) {
       : prospects.filter(p => {
         if (p.statut === "Nouveau" && !afficherNouveau) return false;
         if (p.statut === "Hors cible" && !afficherHorsCible) return false;
+        if (p.statut === "À traiter" && !afficherATraiter) return false;
         return true;
       });
-  // "Pas maintenant" et "Hors cible" restent visibles (si la bascule Hors
-  // cible est activee) mais toujours relegues en bas du tableau, quel que
-  // soit le tri actif sur le reste des lignes -- Hors cible encore plus bas
-  // que Pas maintenant, car c'est ce dont Marie a le moins besoin au quotidien
-  // (le menage se fait via le rappel RGPD annuel, pas ici). A l'inverse, une
-  // relance en retard remonte toujours en tete, avant le tri actif.
+  // "Pas maintenant", "Hors cible" et "À traiter" restent visibles (si leur
+  // bascule respective est activee) mais toujours relegues en bas du tableau,
+  // quel que soit le tri actif sur le reste des lignes -- "À traiter" tout en
+  // bas (encore moins prioritaire que Hors cible) car c'est le lot de profils
+  // ambigus mis de cote pour un second passage, a traiter en tout dernier une
+  // fois le reste du CRM a jour. A l'inverse, une relance en retard remonte
+  // toujours en tete, avant le tri actif.
   const pasMaintenant = visibles.filter(p => p.statut === "Pas maintenant");
   const horsCible = visibles.filter(p => p.statut === "Hors cible");
-  const normales = visibles.filter(p => p.statut !== "Pas maintenant" && p.statut !== "Hors cible");
+  const aTraiter = visibles.filter(p => p.statut === "À traiter");
+  const normales = visibles.filter(p => p.statut !== "Pas maintenant" && p.statut !== "Hors cible" && p.statut !== "À traiter");
   const relancesEnRetard = normales.filter(p => { const r = nextRelance(p); return (r && isOverdue(r)) || estADecider(p); });
   const autresNormales = normales.filter(p => { const r = nextRelance(p); return !((r && isOverdue(r)) || estADecider(p)); });
   // Priorite par date de relance/entree en statut (la plus ancienne en premier) --
   // toujours, meme si un tri par colonne (Statut/Temperature) est actif : ce
   // groupe existe justement pour repondre a l'urgence chronologique, pas au pipeline.
   relancesEnRetard.sort((a, b) => dateUrgence(a) - dateUrgence(b));
-  const lignesOrdonnees = [...relancesEnRetard, ...sortProspects(autresNormales), ...pasMaintenant, ...horsCible];
+  const lignesOrdonnees = [...relancesEnRetard, ...sortProspects(autresNormales), ...pasMaintenant, ...horsCible, ...aTraiter];
 
   const btnNouveau = nbNouveau > 0
     ? `<button class="btn btn--ghost" onclick="toggleAfficherNouveau()">${afficherNouveau ? "Masquer" : "Afficher"} Nouveau (${nbNouveau})</button>`
     : "";
   const btnHorsCible = nbHorsCible > 0
     ? `<button class="btn btn--ghost" onclick="toggleAfficherHorsCible()">${afficherHorsCible ? "Masquer" : "Afficher"} Hors cible (${nbHorsCible})</button>`
+    : "";
+  const btnATraiter = nbATraiter > 0
+    ? `<button class="btn btn--ghost" onclick="toggleAfficherATraiter()">${afficherATraiter ? "Masquer" : "Afficher"} À traiter (${nbATraiter})</button>`
     : "";
 
   return `
@@ -1384,7 +1398,7 @@ function renderProspectsSection(prospects) {
             <option value="">Tous les statuts</option>
             ${STATUT_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === filtreStatut ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}
           </select>
-          ${btnNouveau}${btnHorsCible}
+          ${btnNouveau}${btnHorsCible}${btnATraiter}
           <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
           <button class="btn btn--ghost" onclick="ouvrirRafalePremiersMessages()">Rafale : premiers messages</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
