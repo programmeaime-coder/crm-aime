@@ -1717,9 +1717,14 @@ function openHistoriqueModal(ligne) {
   const evenements = [];
   if (p.dateAppelDecouverte) evenements.push({ label: "Appel découverte", date: p.dateAppelDecouverte });
   if (p.date1erMessage) evenements.push({ label: "1er message", date: p.date1erMessage });
+  // Prefere la date REELLE d'envoi (ecrite par Code.gs des que Nb relances
+  // atteint 1/2) a Relance 1/2 (J), qui reste une date theorique calculee a
+  // partir de la Date 1er message et se decale du reel des que Marie a du
+  // retard sur son stock -- repli sur la date theorique uniquement pour les
+  // prospects traites avant l'ajout de ce champ (dateEnvoiPremiereRelance).
   const n = Number(p.nbRelances) || 0;
-  if (n >= 1 && p.relance1) evenements.push({ label: "Première relance", date: p.relance1 });
-  if (n >= 2 && p.relance2) evenements.push({ label: "Deuxième relance", date: p.relance2 });
+  if (n >= 1 && (p.dateEnvoiPremiereRelance || p.relance1)) evenements.push({ label: "Première relance", date: p.dateEnvoiPremiereRelance || p.relance1 });
+  if (n >= 2 && (p.dateEntreeStatutRelance || p.relance2)) evenements.push({ label: "Deuxième relance", date: p.dateEntreeStatutRelance || p.relance2 });
   if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel) {
     evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel });
   }
