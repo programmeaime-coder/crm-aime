@@ -867,17 +867,17 @@ function relancesADemainHtml(prospects) {
 // de decision" (n=2) -- ce dernier cas active le suivi J+7 (DECISION_CONFIG).
 async function marquerRelanceEnvoyee(ligne) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
-  if (!p) return;
+  if (!p) return false;
   const n = Number(p.nbRelances) || 0;
-  if (n >= 2) return;
+  if (n >= 2) return true;
   p.statut = "Deuxième relance";
-  await updateField(ligne, "nbRelances", String(n + 1));
-  await updateField(ligne, "statut", "Deuxième relance");
+  if (!(await updateField(ligne, "nbRelances", String(n + 1)))) return false;
+  return await updateField(ligne, "statut", "Deuxième relance");
 }
 // Classement en un clic depuis le tag "À décider" (J+7 sans réponse sur
 // Deuxième relance / Reprise de contact) -- voir estADecider().
 async function classerProspect(ligne, nouveauStatut) {
-  await updateField(ligne, "statut", nouveauStatut);
+  return await updateField(ligne, "statut", nouveauStatut);
 }
 function copierRappel(nom) {
   const prenom = (nom || "").split(" ")[0];
@@ -1611,6 +1611,11 @@ function ajouterJoursFr(date, jours) {
   d.setDate(d.getDate() + jours);
   return d.toLocaleDateString("fr-FR");
 }
+// Renvoie true/false (echec deja signale par alert() + loadData(true) ici) --
+// les enchainements Rafale doivent verifier ce retour et ne PAS avancer a la
+// carte suivante en cas d'echec, sinon un enregistrement rate saute son tour
+// silencieusement (l'alert s'affiche, mais rien n'empechait avant ce fix
+// d'enchainer quand meme sur le prospect suivant comme si de rien n'etait).
 async function updateField(ligne, champ, valeur) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
   let basculerVersPremiereRelance = false;
@@ -1645,16 +1650,17 @@ async function updateField(ligne, champ, valeur) {
   } catch (e) {
     alert("Échec de l'enregistrement (connexion). Réessaie.");
     loadData(true);
-    return;
+    return false;
   }
   if (!res || !res.ok) {
     alert("Échec de l'enregistrement : " + (res && res.erreur ? res.erreur : "erreur inconnue"));
     loadData(true);
-    return;
+    return false;
   }
   if (basculerVersPremiereRelance) {
-    await updateField(ligne, "statut", "Première relance");
+    return await updateField(ligne, "statut", "Première relance");
   }
+  return true;
 }
 
 async function updateClientField(ligne, champ, valeur) {
@@ -2036,28 +2042,28 @@ async function rafaleTriJamaisContacte() {
   // le marqueur trieRafale est ecrit, pour ne plus le representer ici.
   const p = rafaleQueue[rafaleIndex];
   p.trieRafale = "1";
-  await updateField(p.ligne, "trieRafale", "1");
+  if (!(await updateField(p.ligne, "trieRafale", "1"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
 async function rafaleTriHorsCible() {
   const p = rafaleQueue[rafaleIndex];
   p.statut = "Hors cible";
-  await updateField(p.ligne, "statut", "Hors cible");
+  if (!(await updateField(p.ligne, "statut", "Hors cible"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
 async function rafaleTriRepriseDeContact() {
   const p = rafaleQueue[rafaleIndex];
   p.statut = "Reprise de contact";
-  await updateField(p.ligne, "statut", "Reprise de contact");
+  if (!(await updateField(p.ligne, "statut", "Reprise de contact"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
 async function rafaleTriPasMaintenant() {
   const p = rafaleQueue[rafaleIndex];
   p.statut = "Pas maintenant";
-  await updateField(p.ligne, "statut", "Pas maintenant");
+  if (!(await updateField(p.ligne, "statut", "Pas maintenant"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
@@ -2067,7 +2073,7 @@ async function rafaleTriEnAttenteConnexion() {
   // Code.gs tamponne automatiquement la date du jour (colonne V) des que ce
   // statut est ecrit -- meme mecanisme que le changement de statut normal
   // depuis le tableau Prospects, voir mettreAJourProspect.
-  await updateField(p.ligne, "statut", "En attente de connexion");
+  if (!(await updateField(p.ligne, "statut", "En attente de connexion"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
@@ -2235,16 +2241,18 @@ async function rafaleActionsEnvoyerSuivant() {
   // le navigateur comme popup.
   const suivant = rafaleQueue[rafaleIndex + 1];
   preparerActionEnvoi(suivant);
+  let ok;
   if (p.statut === "Nouveau" || p.statut === "Reprise de contact") {
     // Reprise de contact : ecrit Date 1er message (jamais utilisee pour cette
     // etape sinon) plutot que de re-ecrire le Statut -- Code.gs s'en sert pour
     // tamponner la colonne Y a la date d'envoi REELLE (pas la date du tri), et
     // ca sert aussi de marqueur "deja envoye" pour ne plus le re-proposer ici
     // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
-    await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
+    ok = await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
   } else {
-    await marquerRelanceEnvoyee(p.ligne);
+    ok = await marquerRelanceEnvoyee(p.ligne);
   }
+  if (!ok) return;
   rafaleIndex++;
   renderRafaleActionCard();
 }
@@ -2258,7 +2266,7 @@ async function rafaleActionsDecisionClasser(statutCible) {
     openConvertModal(p.ligne, p.nom);
     return;
   }
-  await classerProspect(p.ligne, statutCible);
+  if (!(await classerProspect(p.ligne, statutCible))) return;
   rafaleIndex++;
   renderRafaleActionCard();
 }
