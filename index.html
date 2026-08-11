@@ -534,7 +534,17 @@ function nextRelance(p) {
   if (p.statut !== "Première relance" && p.statut !== "Deuxième relance") return null;
   const n = Number(p.nbRelances) || 0;
   if (n === 0 && p.relance1) return p.relance1;
-  if (n === 1 && p.relance2) return p.relance2;
+  if (n === 1) {
+    // La relance 2 doit partir de la date REELLE d'envoi de la relance 1
+    // (colonne AA, dateEnvoiPremiereRelance) + 7j -- meme ecart que le J+5/J+12
+    // theorique -- et non du theorique J+12 depuis Date 1er message. Sinon,
+    // des qu'une relance 1 part en retard sur le planning, la relance 2
+    // apparait deja due le jour meme (voire avant), ce qui n'a pas de sens :
+    // jamais deux relances proposees le meme jour.
+    const baseReelle = parseFrDate(p.dateEnvoiPremiereRelance);
+    if (baseReelle) return ajouterJoursFr(baseReelle, 7);
+    if (p.relance2) return p.relance2;
+  }
   return null;
 }
 // Statuts "en attente d'une decision" qui, sans intervention de Marie, ne
