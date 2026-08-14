@@ -270,6 +270,13 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .pie-legend__item { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; }
 .pie-legend__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 
+.funnel { display: flex; flex-direction: column; gap: 1.1rem; }
+.funnel-row__top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 13px; }
+.funnel-row__label { font-weight: 500; }
+.funnel-row__track { background: var(--border); height: 22px; }
+.funnel-row__bar { background: var(--bordeaux); height: 100%; transition: width 0.3s; }
+.funnel-row__note { font-size: 12px; margin-top: 3px; }
+
 .loading-msg { text-align: center; padding: 4rem; color: var(--text-muted); font-size: 13px; }
 
 /* ─── Ecran de verrouillage ─── */
@@ -1657,6 +1664,33 @@ function pieChartHtml(segments, sizePx) {
   `;
 }
 
+// Chaque etape : { label, valeur, base, note }. La largeur de barre est
+// proportionnelle a "base" (l'effectif de la toute premiere etape, "Contactes")
+// -- pas a l'etape precedente -- pour que la baisse visuelle entre chaque
+// barre reflete directement le taux de perte cumule depuis le debut du
+// funnel, ce qui est le but recherche ("ou est-ce que ca bloque").
+function funnelHtml(etapes) {
+  const maxValeur = Math.max(1, ...etapes.map(e => e.base));
+  return `
+    <div class="funnel">
+      ${etapes.map(e => {
+        const largeur = Math.max(2, Math.round((e.valeur / maxValeur) * 100));
+        const pct = maxValeur ? Math.round((e.valeur / maxValeur) * 100) : 0;
+        return `
+          <div class="funnel-row">
+            <div class="funnel-row__top">
+              <span class="funnel-row__label">${escapeHtml(e.label)}</span>
+              <span class="funnel-row__value">${e.valeur} <span class="muted">(${pct}%)</span></span>
+            </div>
+            <div class="funnel-row__track"><div class="funnel-row__bar" style="width:${largeur}%"></div></div>
+            ${e.note ? `<div class="funnel-row__note muted">${e.note}</div>` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function statsFunnelData(prospects) {
   const contactes = prospects.filter(p => {
     const nbr = Number(p.nbRelances) || 0;
@@ -1738,24 +1772,15 @@ function renderStatsSection(data) {
     </div>
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Réponses — sur les ${funnel.nContactes} prospects contactés</span></div>
-      ${pieChartHtml([
-        { label: "A répondu", value: funnel.nRepondus, color: "var(--success)" },
-        { label: "En attente (avant relance 1)", value: funnel.enAttente0, color: "var(--bordeaux-pale)" },
-        { label: "En attente (avant relance 2)", value: funnel.enAttente1, color: "var(--bordeaux-mid)" },
-        { label: "2 relances envoyées, sans réponse", value: funnel.enAttente2, color: "var(--bordeaux)" }
-      ], 170)}
-      <p class="muted" style="margin-top:1rem;">Stock non travaillé (hors de ce calcul) : ${prospects.length - funnel.nContactes} prospects — dont ${(prospects.filter(p => p.statut === "Nouveau").length)} "Nouveau" jamais triés, ${(prospects.filter(p => p.statut === "À traiter").length)} "À traiter", ${(prospects.filter(p => p.statut === "Hors cible").length)} "Hors cible".</p>
-    </div>
-
-    <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Efficacité par message — sur les ${funnel.nContactes} prospects contactés</span></div>
+      <div class="section__head"><span class="section__eyebrow">Funnel — où est-ce que ça bloque ?</span></div>
       <p class="muted" style="margin-bottom:1rem;">Comparaison utile seulement à partir de maintenant : Date de réponse se tamponne automatiquement depuis le 14/08/2026, les prospects traités avant cette date n'ont pas cette donnée rétroactivement.</p>
-      <div class="objectifs-grid" style="grid-template-columns:repeat(3,1fr);">
-        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[0] || 0, funnel.nContactes)}</div><div class="stat__label">Réponse au 1er message</div></div>
-        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[1] || 0, funnel.nbr1Plus)}</div><div class="stat__label">Réponse après relance 1</div></div>
-        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[2] || 0, funnel.nbr2Plus)}</div><div class="stat__label">Réponse après relance 2</div></div>
-      </div>
+      ${funnelHtml([
+        { label: "Contactés (1er message envoyé)", valeur: funnel.nContactes, base: funnel.nContactes, note: null },
+        { label: "Relance 1 envoyée", valeur: funnel.nbr1Plus, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[0] || 0, funnel.nContactes) + " ont répondu au 1er message" },
+        { label: "Relance 2 envoyée", valeur: funnel.nbr2Plus, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[1] || 0, funnel.nbr1Plus) + " ont répondu après la relance 1" },
+        { label: "Appel découverte", valeur: appelsListe.length, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[2] || 0, funnel.nbr2Plus) + " ont répondu après la relance 2 — " + tauxAvecEffectif(appelsListe.length, funnel.nRepondus) + " des réponses (tous stades) débouchent sur un appel" },
+        { label: "Client", valeur: clients.length, base: funnel.nContactes, note: tauxAvecEffectif(clients.length, appelsListe.length) + " des appels découverte signent" }
+      ])}
     </div>
 
     <div class="section">
