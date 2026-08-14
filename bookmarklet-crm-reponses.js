@@ -52,7 +52,35 @@
       .trim();
   }
 
-  var RE_DATE = /(aujourd['’]hui|hier|il y a \d+\s*(?:j|jour|jours|sem|semaine|semaines|mois)|\d{1,2}\s*(?:janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)\.?|\d{1,2}:\d{2})/i;
+  var RE_DATE = /(aujourd['’]hui|hier|il y a \d+\s*(?:j|jour|jours|sem|semaine|semaines|mois)|\d{1,2}\s*(?:janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)\.?(?:\s*\d{4})?|\d{1,2}:\d{2})/i;
+
+  // Estimation en jours de l'anciennete du dernier message, a partir du texte
+  // de date affiche par LinkedIn -- sert au seuil "Recontacter" (6 mois sans
+  // reponse). Approximatif par construction : "12 juin" sans annee (format le
+  // plus courant sur les fils de quelques mois) suppose l'annee en cours, en
+  // reculant d'un an si la date tomberait dans le futur -- imprecision
+  // possible de quelques jours, sans consequence sur un seuil a 6 mois.
+  var MOIS_FR = { "janv": 0, "fevr": 1, "mars": 2, "avr": 3, "mai": 4, "juin": 5, "juil": 6, "aout": 7, "sept": 8, "oct": 9, "nov": 10, "dec": 11 };
+  function ageJoursDepuisTexte(texte) {
+    var t = texte.toLowerCase();
+    if (/aujourd['’]hui/.test(t) || /\d{1,2}:\d{2}/.test(t)) return 0;
+    if (/hier/.test(t)) return 1;
+    var m = t.match(/il y a (\d+)\s*j/); if (m) return parseInt(m[1], 10);
+    m = t.match(/il y a (\d+)\s*sem/); if (m) return parseInt(m[1], 10) * 7;
+    m = t.match(/il y a (\d+)\s*mois/); if (m) return parseInt(m[1], 10) * 30;
+    m = t.match(/(\d{1,2})\s*([a-zûé]+)\.?\s*(\d{4})?/);
+    if (m) {
+      var moisTxt = m[2].normalize("NFD").replace(/[̀-ͯ]/g, "").slice(0, 5);
+      var moisIdx = -1;
+      for (var k in MOIS_FR) { if (moisTxt.indexOf(k.slice(0, 4)) === 0 || k.indexOf(moisTxt.slice(0, 4)) === 0) { moisIdx = MOIS_FR[k]; break; } }
+      if (moisIdx === -1) return null;
+      var annee = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+      var d = new Date(annee, moisIdx, parseInt(m[1], 10));
+      if (!m[3] && d.getTime() > Date.now()) d.setFullYear(annee - 1);
+      return Math.round((Date.now() - d.getTime()) / 86400000);
+    }
+    return null;
+  }
 
   // Le texte complet de la ligne (nom + date + emetteur + extrait, sans
   // separateur garanti) est decoupe en trois : tout AVANT la date = nom,
@@ -73,6 +101,7 @@
     return {
       nom: nom,
       date: mDate[0],
+      ageJours: ageJoursDepuisTexte(mDate[0]),
       dernierEnvoyeurEstMarie: /^vous$/i.test(emetteur),
       extrait: extrait
     };
@@ -129,6 +158,7 @@
     var COULEURS = {
       "En conversation": "#15803d",
       "Écart détecté": "#b8824a",
+      "Recontacter": "#5b6b85",
       "Aucune conversation trouvée": "#8B1A1A"
     };
     suggestions.forEach(function (s) {
@@ -155,6 +185,21 @@
       ligneRaison.style.cssText = "color:#767676;font-size:12px;";
       ligneRaison.textContent = s.raison;
       ligne.appendChild(ligneRaison);
+
+      if (s.suggestion === "Recontacter") {
+        var btn = document.createElement("button");
+        btn.textContent = "Confirmer → Recontacter";
+        btn.style.cssText = "margin-top:6px;padding:5px 10px;background:#8B1A1A;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;";
+        btn.onclick = function () {
+          var url = URL_BASE + "?action=updateProspect&pwd=" + encodeURIComponent(pwd)
+            + "&ligne=" + s.ligne + "&champ=statut&valeur=" + encodeURIComponent("Recontacter");
+          window.open(url, "crmaime_confirm_" + s.ligne);
+          btn.textContent = "Confirmé ✓";
+          btn.disabled = true;
+          btn.style.background = "#767676";
+        };
+        ligne.appendChild(btn);
+      }
 
       panneau.appendChild(ligne);
     });
