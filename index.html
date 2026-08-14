@@ -1759,6 +1759,17 @@ function renderStatsSection(data) {
   const paletteOrigine = ["var(--bordeaux)", "var(--amber)", "var(--success)", "#5b6b85"];
   const segmentsOrigine = Object.keys(origineCounts).map((o, i) => ({ label: o, value: origineCounts[o], color: paletteOrigine[i % paletteOrigine.length] }));
 
+  // "Pourquoi ça bloque" : parmi les appels decouverte qui n'ont PAS signe,
+  // repartition par issue reelle (deja disponible via le Statut actuel du
+  // prospect -- aucune nouvelle saisie). "Client" = a signe, tout le reste
+  // = n'a pas debouche sur une vente, avec la raison (Hors cible = pas la
+  // cible, Pas maintenant = timing, "Appel découverte" = decision pas
+  // encore prise).
+  const appelsNonSignes = appelsListe.filter(a => a.statut !== "Client");
+  const issueCounts = {};
+  appelsNonSignes.forEach(a => { const k = a.statut || "(à décider)"; issueCounts[k] = (issueCounts[k] || 0) + 1; });
+  const resumeIssues = Object.entries(issueCounts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ");
+
   const appelsRows = appelsListe.map(a => `
     <tr>
       <td>${escapeHtml(a.nom || "")}</td>
@@ -1767,6 +1778,7 @@ function renderStatsSection(data) {
       <td>${escapeHtml(CANAL_LABELS[a.canal] || a.canal || "—")}</td>
       <td>${escapeHtml(a.origine || "—")}</td>
       <td>${escapeHtml(a.date || "—")}</td>
+      <td><span class="${STATUT_CLASS[a.statut] || "st-neutral"}" style="padding:3px 8px;border-radius:3px;font-size:11px;white-space:nowrap;">${escapeHtml(a.statut || "—")}</span></td>
     </tr>
   `).join("");
 
@@ -1791,13 +1803,14 @@ function renderStatsSection(data) {
     </div>
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil & origine (n=${appelsListe.length})</span></div>
+      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil, origine & pourquoi ça bloque (n=${appelsListe.length})</span></div>
       ${appelsListe.length < 10 ? `<p class="muted" style="margin-bottom:1rem;">Échantillon encore petit pour dégager un vrai pattern — liste brute ci-dessous en attendant plus de volume.</p>` : ""}
+      ${appelsNonSignes.length ? `<p style="margin-bottom:1rem;">Sur ${appelsListe.length} appels : <b>${appelsListe.length - appelsNonSignes.length}</b> ont signé, ${appelsNonSignes.length} non — ${resumeIssues}.</p>` : ""}
       ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 130) : `<p class="muted" style="margin-bottom:1rem;">Origine pas encore renseignée — elle se demande automatiquement (popup facultatif) dès qu'un Statut passe à "Appel découverte".</p>`}
       ${appelsListe.length ? `
         <div class="table-wrap" style="margin-top:1rem;">
           <table>
-            <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Date</th></tr></thead>
+            <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Date</th><th>Résultat</th></tr></thead>
             <tbody>${appelsRows}</tbody>
           </table>
         </div>
