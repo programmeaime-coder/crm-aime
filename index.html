@@ -1735,7 +1735,7 @@ function renderStatsSection(data) {
   `).join("");
 
   return `
-    <div class="stats">
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);">
       <div class="stat"><div class="stat__value">${prospects.length}</div><div class="stat__label">Prospects en base</div></div>
       <div class="stat"><div class="stat__value">${funnel.nContactes}</div><div class="stat__label">Contactés (≥1 message)</div></div>
       <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div><div class="stat__label">Taux de réponse global</div></div>
