@@ -6,10 +6,14 @@
 // passe du CRM une fois. Le script defile la liste des conversations par
 // paliers, lit pour chacune le nom, la date du dernier message et QUI l'a
 // envoye en dernier (Marie ou le prospect), envoie ca par lots au backend
-// Apps Script (action=matcherReponses) qui compare a l'onglet Prospects, puis
-// affiche un panneau flottant avec les suggestions -- jamais d'ecriture
-// automatique, chaque changement de Statut passe par un clic "Confirmer"
-// explicite (memes garde-fous que le reste du CRM).
+// Apps Script (action=matcherReponses) qui compare a l'onglet Prospects. Une
+// fois tous les paquets traites, un dernier appel (action=verifierAbsents)
+// signale les prospects "en attente" dont aucun fil n'a ete repere du tout.
+// Le panneau flottant affiche tout ca. Cas "reponse recue" (signal fiable,
+// valide par Marie) : le Statut passe automatiquement a "En conversation",
+// deja fait au moment ou le panneau s'affiche. Les autres cas (ecarts,
+// absences) restent purement informatifs -- a verifier a la main dans
+// l'onglet Prospects, rien n'est ecrit pour ceux-la.
 //
 // Construit le 2026-08-14 a partir de captures d'ecran reelles de la
 // messagerie de Marie (pas de la doc LinkedIn) : chaque ligne de conversation
@@ -99,7 +103,10 @@
 
     var entete = document.createElement("div");
     entete.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;";
-    entete.innerHTML = "<b style='font-size:15px;'>CRM — Reconciliation (" + suggestions.length + "/" + nAnalysees + ")</b>";
+    var titre = document.createElement("b");
+    titre.style.fontSize = "15px";
+    titre.textContent = "CRM — Reconciliation (" + suggestions.length + "/" + nAnalysees + ")";
+    entete.appendChild(titre);
     var fermer = document.createElement("button");
     fermer.textContent = "✕";
     fermer.style.cssText = "border:none;background:none;font-size:16px;cursor:pointer;";
@@ -119,10 +126,14 @@
     // Construction via createElement/textContent plutot que innerHTML : s.nom
     // vient du texte scrape sur LinkedIn (page tierce, pas du contenu de
     // confiance) -- jamais interpole tel quel dans du HTML.
+    var COULEURS = {
+      "En conversation": "#15803d",
+      "Écart détecté": "#b8824a",
+      "Aucune conversation trouvée": "#8B1A1A"
+    };
     suggestions.forEach(function (s) {
       var ligne = document.createElement("div");
       ligne.style.cssText = "border-top:1px solid #eee;padding:10px 0;";
-      var estReponse = s.suggestion === "En conversation";
 
       var ligneNom = document.createElement("div");
       var nomEl = document.createElement("b");
@@ -136,8 +147,8 @@
       ligne.appendChild(ligneNom);
 
       var ligneSuggestion = document.createElement("div");
-      ligneSuggestion.style.cssText = "margin:4px 0;color:" + (estReponse ? "#15803d" : "#b8824a") + ";";
-      ligneSuggestion.textContent = "→ " + s.suggestion;
+      ligneSuggestion.style.cssText = "margin:4px 0;color:" + (COULEURS[s.suggestion] || "#767676") + ";";
+      ligneSuggestion.textContent = (s.appliqueAuto ? "✓ " : "→ ") + s.suggestion;
       ligne.appendChild(ligneSuggestion);
 
       var ligneRaison = document.createElement("div");
@@ -145,20 +156,6 @@
       ligneRaison.textContent = s.raison;
       ligne.appendChild(ligneRaison);
 
-      if (estReponse) {
-        var btn = document.createElement("button");
-        btn.textContent = "Confirmer → En conversation";
-        btn.style.cssText = "margin-top:6px;padding:5px 10px;background:#8B1A1A;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;";
-        btn.onclick = function () {
-          var url = URL_BASE + "?action=updateProspect&pwd=" + encodeURIComponent(pwd)
-            + "&ligne=" + s.ligne + "&champ=statut&valeur=" + encodeURIComponent("En conversation");
-          window.open(url, "crmaime_confirm_" + s.ligne);
-          btn.textContent = "Confirmé ✓";
-          btn.disabled = true;
-          btn.style.background = "#767676";
-        };
-        ligne.appendChild(btn);
-      }
       panneau.appendChild(ligne);
     });
 
@@ -173,16 +170,40 @@
     var paquets = [];
     for (var i = 0; i < conversations.length; i += 40) paquets.push(conversations.slice(i, i + 40));
     var suggestions = [];
+    var lignesTrouvees = [];
     var recus = 0, termine = false;
+
+    function verifierAbsentsPuisAfficher() {
+      var url = URL_BASE + "?action=verifierAbsents&pwd=" + encodeURIComponent(pwd)
+        + "&lignes=" + encodeURIComponent(JSON.stringify(lignesTrouvees));
+      var attendu = true;
+      function surMessageAbsents(ev) {
+        if (!ev.data || ev.data.type !== "crmaime_absents_resultat") return;
+        attendu = false;
+        window.removeEventListener("message", surMessageAbsents);
+        suggestions = suggestions.concat(ev.data.suggestions || []);
+        afficherPanneau(suggestions, conversations.length);
+      }
+      window.addEventListener("message", surMessageAbsents);
+      window.open(url, "crmaime_absents");
+      setTimeout(function () {
+        if (attendu) {
+          window.removeEventListener("message", surMessageAbsents);
+          afficherPanneau(suggestions, conversations.length);
+        }
+      }, 4000);
+    }
+
     function finir() {
       if (termine) return;
       termine = true;
       window.removeEventListener("message", surMessage);
-      afficherPanneau(suggestions, conversations.length);
+      verifierAbsentsPuisAfficher();
     }
     function surMessage(ev) {
       if (!ev.data || ev.data.type !== "crmaime_reponses_resultat") return;
       suggestions = suggestions.concat(ev.data.suggestions || []);
+      lignesTrouvees = lignesTrouvees.concat(ev.data.lignesTrouvees || []);
       recus++;
       if (recus >= paquets.length) finir();
     }
