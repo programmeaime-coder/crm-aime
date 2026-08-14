@@ -6,14 +6,26 @@
 // passe du CRM une fois. Le script defile la liste des conversations par
 // paliers, lit pour chacune le nom, la date du dernier message et QUI l'a
 // envoye en dernier (Marie ou le prospect), envoie ca par lots au backend
-// Apps Script (action=matcherReponses) qui compare a l'onglet Prospects. Une
-// fois tous les paquets traites, un dernier appel (action=verifierAbsents)
-// signale les prospects "en attente" dont aucun fil n'a ete repere du tout.
-// Le panneau flottant affiche tout ca. Cas "reponse recue" (signal fiable,
-// valide par Marie) : le Statut passe automatiquement a "En conversation",
-// deja fait au moment ou le panneau s'affiche. Les autres cas (ecarts,
-// absences) restent purement informatifs -- a verifier a la main dans
-// l'onglet Prospects, rien n'est ecrit pour ceux-la.
+// Apps Script (action=matcherReponses) qui compare a TOUTE la base (pas
+// seulement les prospects deja en cours de relance -- objectif principal :
+// retrouver, parmi les ~1800 "Nouveau"/"A traiter" (statut par defaut de
+// l'import en lot), ceux qui ont en realite deja une conversation LinkedIn
+// des mois d'activite hors CRM). Une fois tous les paquets traites, un
+// dernier appel (action=verifierAbsents) signale les prospects deja en cours
+// de relance (Premiere/Deuxieme/Reprise de contact) dont aucun fil n'a ete
+// repere du tout. Le panneau flottant affiche tout ca.
+//
+// Cas ECRITS AUTOMATIQUEMENT (signal fiable, valide par Marie) :
+//  - reponse recue (dernier message du prospect) -> "En conversation"
+//  - fil sans reponse de plus de 6 mois -> "Recontacter"
+//  - "Nouveau"/"A traiter" avec un stade de message identifiable (1er
+//    message / relance 1 / relance 2) -> reclasse en "Premiere relance" ou
+//    "Deuxieme relance" avec Nb relances et la date reelle du dernier envoi
+// Cas laisses en INFORMATIF SEULEMENT (pas d'ecriture, decision manuelle) :
+//  - stade non identifiable (message reel trop different des signatures
+//    connues) sur un "Nouveau"/"A traiter"
+//  - ecart de stade sur un prospect deja etage (Premiere/Deuxieme relance)
+//  - absence totale de fil sur un prospect deja etage
 //
 // Construit le 2026-08-14 a partir de captures d'ecran reelles de la
 // messagerie de Marie (pas de la doc LinkedIn) : chaque ligne de conversation
@@ -29,10 +41,10 @@
   var URL_BASE = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
   var pwd = prompt("Mot de passe du CRM ?", "");
   if (pwd === null) return;
-  var reponse = prompt("Combien de paliers de defilement ?", "15");
+  var reponse = prompt("Combien de paliers de defilement ? (chaque palier ~= quelques conversations ; monter haut (ex. 100+) pour couvrir plusieurs mois d'historique)", "60");
   if (reponse === null) return;
   var PALIERS = parseInt(reponse, 10);
-  if (!PALIERS || PALIERS < 1) PALIERS = 15;
+  if (!PALIERS || PALIERS < 1) PALIERS = 60;
   var PAS = 600;
   var DELAI = 1400;
   var conversations = [];
@@ -54,32 +66,45 @@
 
   var RE_DATE = /(aujourd['’]hui|hier|il y a \d+\s*(?:j|jour|jours|sem|semaine|semaines|mois)|\d{1,2}\s*(?:janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)\.?(?:\s*\d{4})?|\d{1,2}:\d{2})/i;
 
-  // Estimation en jours de l'anciennete du dernier message, a partir du texte
-  // de date affiche par LinkedIn -- sert au seuil "Recontacter" (6 mois sans
-  // reponse). Approximatif par construction : "12 juin" sans annee (format le
+  // Estimation de la date reelle (et de l'anciennete en jours) du dernier
+  // message, a partir du texte de date affiche par LinkedIn -- sert au seuil
+  // "Recontacter" (6 mois sans reponse) ET, quand un stade de message est
+  // identifie, a remplir la vraie date d'envoi (Date 1er message / date
+  // reelle de relance) sur les prospects reclasses depuis "Nouveau"/"A
+  // traiter". Approximatif par construction : "12 juin" sans annee (format le
   // plus courant sur les fils de quelques mois) suppose l'annee en cours, en
   // reculant d'un an si la date tomberait dans le futur -- imprecision
-  // possible de quelques jours, sans consequence sur un seuil a 6 mois.
+  // possible de quelques jours, sans consequence sur un seuil a 6 mois ni sur
+  // une date affichee a titre indicatif.
   var MOIS_FR = { "janv": 0, "fevr": 1, "mars": 2, "avr": 3, "mai": 4, "juin": 5, "juil": 6, "aout": 7, "sept": 8, "oct": 9, "nov": 10, "dec": 11 };
-  function ageJoursDepuisTexte(texte) {
+  function dateIso(d) {
+    var mm = String(d.getMonth() + 1).padStart(2, "0");
+    var jj = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + mm + "-" + jj;
+  }
+  function parseDateLinkedIn(texte) {
     var t = texte.toLowerCase();
-    if (/aujourd['’]hui/.test(t) || /\d{1,2}:\d{2}/.test(t)) return 0;
-    if (/hier/.test(t)) return 1;
-    var m = t.match(/il y a (\d+)\s*j/); if (m) return parseInt(m[1], 10);
-    m = t.match(/il y a (\d+)\s*sem/); if (m) return parseInt(m[1], 10) * 7;
-    m = t.match(/il y a (\d+)\s*mois/); if (m) return parseInt(m[1], 10) * 30;
+    var maintenant = new Date();
+    if (/aujourd['’]hui/.test(t) || /\d{1,2}:\d{2}/.test(t)) return { ageJours: 0, dateISO: dateIso(maintenant) };
+    if (/hier/.test(t)) { var h = new Date(maintenant); h.setDate(h.getDate() - 1); return { ageJours: 1, dateISO: dateIso(h) }; }
+    var m = t.match(/il y a (\d+)\s*j/);
+    if (m) { var d1 = new Date(maintenant); d1.setDate(d1.getDate() - parseInt(m[1], 10)); return { ageJours: parseInt(m[1], 10), dateISO: dateIso(d1) }; }
+    m = t.match(/il y a (\d+)\s*sem/);
+    if (m) { var jrs = parseInt(m[1], 10) * 7; var d2 = new Date(maintenant); d2.setDate(d2.getDate() - jrs); return { ageJours: jrs, dateISO: dateIso(d2) }; }
+    m = t.match(/il y a (\d+)\s*mois/);
+    if (m) { var jrs2 = parseInt(m[1], 10) * 30; var d3 = new Date(maintenant); d3.setDate(d3.getDate() - jrs2); return { ageJours: jrs2, dateISO: dateIso(d3) }; }
     m = t.match(/(\d{1,2})\s*([a-zûé]+)\.?\s*(\d{4})?/);
     if (m) {
       var moisTxt = m[2].normalize("NFD").replace(/[̀-ͯ]/g, "").slice(0, 5);
       var moisIdx = -1;
       for (var k in MOIS_FR) { if (moisTxt.indexOf(k.slice(0, 4)) === 0 || k.indexOf(moisTxt.slice(0, 4)) === 0) { moisIdx = MOIS_FR[k]; break; } }
-      if (moisIdx === -1) return null;
-      var annee = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+      if (moisIdx === -1) return { ageJours: null, dateISO: null };
+      var annee = m[3] ? parseInt(m[3], 10) : maintenant.getFullYear();
       var d = new Date(annee, moisIdx, parseInt(m[1], 10));
       if (!m[3] && d.getTime() > Date.now()) d.setFullYear(annee - 1);
-      return Math.round((Date.now() - d.getTime()) / 86400000);
+      return { ageJours: Math.round((Date.now() - d.getTime()) / 86400000), dateISO: dateIso(d) };
     }
-    return null;
+    return { ageJours: null, dateISO: null };
   }
 
   // Le texte complet de la ligne (nom + date + emetteur + extrait, sans
@@ -98,10 +123,12 @@
     if (!mColon) return null;
     var emetteur = mColon[1].trim();
     var extrait = mColon[2].trim().slice(0, 140);
+    var parsed = parseDateLinkedIn(mDate[0]);
     return {
       nom: nom,
       date: mDate[0],
-      ageJours: ageJoursDepuisTexte(mDate[0]),
+      ageJours: parsed.ageJours,
+      dateISO: parsed.dateISO,
       dernierEnvoyeurEstMarie: /^vous$/i.test(emetteur),
       extrait: extrait
     };
@@ -157,8 +184,11 @@
     // confiance) -- jamais interpole tel quel dans du HTML.
     var COULEURS = {
       "En conversation": "#15803d",
-      "Écart détecté": "#b8824a",
+      "Première relance": "#15803d",
+      "Deuxième relance": "#15803d",
       "Recontacter": "#5b6b85",
+      "Écart détecté": "#b8824a",
+      "À vérifier manuellement": "#b8824a",
       "Aucune conversation trouvée": "#8B1A1A"
     };
     suggestions.forEach(function (s) {
@@ -185,21 +215,6 @@
       ligneRaison.style.cssText = "color:#767676;font-size:12px;";
       ligneRaison.textContent = s.raison;
       ligne.appendChild(ligneRaison);
-
-      if (s.suggestion === "Recontacter") {
-        var btn = document.createElement("button");
-        btn.textContent = "Confirmer → Recontacter";
-        btn.style.cssText = "margin-top:6px;padding:5px 10px;background:#8B1A1A;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;";
-        btn.onclick = function () {
-          var url = URL_BASE + "?action=updateProspect&pwd=" + encodeURIComponent(pwd)
-            + "&ligne=" + s.ligne + "&champ=statut&valeur=" + encodeURIComponent("Recontacter");
-          window.open(url, "crmaime_confirm_" + s.ligne);
-          btn.textContent = "Confirmé ✓";
-          btn.disabled = true;
-          btn.style.background = "#767676";
-        };
-        ligne.appendChild(btn);
-      }
 
       panneau.appendChild(ligne);
     });
