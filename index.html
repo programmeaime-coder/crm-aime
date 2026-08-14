@@ -264,6 +264,12 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .profil-cible__chip { font-size: 12.5px; background: #fff; border: 0.5px solid var(--border); padding: 5px 12px; }
 .profil-cible__chip b { color: var(--bordeaux); }
 
+.pie-chart { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+.pie-chart__circle { border-radius: 50%; flex-shrink: 0; }
+.pie-legend { display: flex; flex-direction: column; gap: 0.6rem; }
+.pie-legend__item { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; }
+.pie-legend__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+
 .loading-msg { text-align: center; padding: 4rem; color: var(--text-muted); font-size: 13px; }
 
 /* ─── Ecran de verrouillage ─── */
@@ -314,6 +320,7 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
     <button class="tab-btn active" data-tab="dashboard">Tableau de bord</button>
     <button class="tab-btn" data-tab="prospects">Prospects</button>
     <button class="tab-btn" data-tab="clients">Clients</button>
+    <button class="tab-btn" data-tab="stats">Stats</button>
   </div>
 
   <div class="loading-msg" id="loading">Chargement…</div>
@@ -321,6 +328,7 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
   <div class="tab-panel" id="tab-dashboard" hidden></div>
   <div class="tab-panel" id="tab-prospects" hidden></div>
   <div class="tab-panel" id="tab-clients" hidden></div>
+  <div class="tab-panel" id="tab-stats" hidden></div>
 </div>
 
 <div class="modal-overlay" id="modal-overlay" hidden>
@@ -669,6 +677,7 @@ function render(data) {
   document.getElementById("tab-dashboard").innerHTML = renderDashboard(data);
   document.getElementById("tab-prospects").innerHTML = renderProspectsSection(data.prospects);
   document.getElementById("tab-clients").innerHTML = renderClientsSection(data.clients);
+  document.getElementById("tab-stats").innerHTML = renderStatsSection(data);
 
   document.querySelectorAll(".tab-panel").forEach(p => p.hidden = (p.id !== "tab-" + currentTab));
 }
@@ -1607,6 +1616,163 @@ function renderClientsTable(clients) {
   `;
 }
 
+// ─── Onglet Stats ───
+// Tout est recalcule cote client a partir de data.prospects/data.clients deja
+// charges -- aucune nouvelle lecture Sheet, aucune saisie supplementaire pour
+// Marie. Le taux de reponse par etape s'appuie sur Date reponse (M) et Nb
+// relances (L), tamponnes automatiquement par Code.gs des qu'un Statut de
+// reponse est enregistre (voir mettreAJourProspect, STATUTS_REPONSE) -- cette
+// capture est nouvelle (2026-08-14), donc les prospects deja avances avant
+// cette date n'ont pas de Date reponse retroactive : les taux ci-dessous ne
+// portent que sur ce qui a ete enregistre depuis, et deviendront plus
+// representatifs avec le temps.
+
+const STATUTS_REPONSE_POSITIVE = ["En conversation", "Recontacter", "Appel découverte", "En attente de paiement"];
+
+function pieChartHtml(segments, sizePx) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  const size = sizePx || 150;
+  if (!total) {
+    return `<div class="pie-chart"><div class="pie-chart__circle" style="width:${size}px;height:${size}px;background:#eee;"></div><p class="muted">Pas encore de données.</p></div>`;
+  }
+  let acc = 0;
+  const actifs = segments.filter(s => s.value > 0);
+  const stops = actifs.map(s => {
+    const start = (acc / total) * 100;
+    acc += s.value;
+    const end = (acc / total) * 100;
+    return `${s.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  }).join(", ");
+  const legend = actifs.map(s => `
+    <div class="pie-legend__item">
+      <span class="pie-legend__dot" style="background:${s.color}"></span>
+      <span>${escapeHtml(s.label)} — <b>${s.value}</b> (${Math.round((s.value / total) * 100)}%)</span>
+    </div>
+  `).join("");
+  return `
+    <div class="pie-chart">
+      <div class="pie-chart__circle" style="width:${size}px;height:${size}px;background:conic-gradient(${stops});"></div>
+      <div class="pie-legend">${legend}</div>
+    </div>
+  `;
+}
+
+function statsFunnelData(prospects) {
+  const contactes = prospects.filter(p => {
+    const nbr = Number(p.nbRelances) || 0;
+    return !!p.date1erMessage || nbr > 0 || STATUTS_REPONSE_POSITIVE.indexOf(p.statut) !== -1 || p.statut === "Deuxième relance";
+  });
+  const nbr1Plus = contactes.filter(p => (Number(p.nbRelances) || 0) >= 1).length;
+  const nbr2Plus = contactes.filter(p => (Number(p.nbRelances) || 0) >= 2).length;
+  const repondus = contactes.filter(p => !!p.dateReponse);
+  const parEtape = { 0: 0, 1: 0, 2: 0 };
+  repondus.forEach(p => {
+    const n = Number(p.nbRelances) || 0;
+    parEtape[n] = (parEtape[n] || 0) + 1;
+  });
+  const delais = contactes.map(p => Number(p.delaiReponse)).filter(d => !isNaN(d) && d > 0);
+  const delaiMoyen = delais.length ? Math.round(delais.reduce((a, b) => a + b, 0) / delais.length) : null;
+  return {
+    nContactes: contactes.length,
+    nbr1Plus, nbr2Plus,
+    nRepondus: repondus.length,
+    parEtape,
+    delaiMoyen,
+    nDelais: delais.length
+  };
+}
+
+function tauxAvecEffectif(numerateur, denominateur) {
+  if (!denominateur) return `<span class="muted">— (n=0)</span>`;
+  const pct = Math.round((numerateur / denominateur) * 100);
+  return `${pct}% <span class="muted">(${numerateur}/${denominateur})</span>`;
+}
+
+function appelsDecouverteListe(prospects, clients) {
+  const items = [];
+  prospects.forEach(p => {
+    if (p.dateAppelDecouverte) items.push({ nom: p.nom, poste: p.poste, temperature: p.temperature, canal: p.canal, origine: p.interetExprime, statut: p.statut, date: p.dateAppelDecouverte });
+  });
+  clients.forEach(c => {
+    if (c.dateAppelDecouverte) items.push({ nom: c.nom, poste: c.metier, temperature: "", canal: c.canal, origine: "", statut: "Client", date: c.dateAppelDecouverte });
+  });
+  items.sort((a, b) => (parseFrDate(b.date) || 0) - (parseFrDate(a.date) || 0));
+  return items;
+}
+
+function renderStatsSection(data) {
+  const prospects = data.prospects;
+  const clients = data.clients;
+  const funnel = statsFunnelData(prospects);
+
+  const statutCounts = {};
+  prospects.forEach(p => { const s = p.statut || "(vide)"; statutCounts[s] = (statutCounts[s] || 0) + 1; });
+  const paletteStatuts = {
+    "Nouveau": "#f0f0f0", "À traiter": "#fdf0d5", "Hors cible": "#e5e5e5",
+    "En attente de connexion": "#e3edfa", "Reprise de contact": "#c8ebe4",
+    "Première relance": "var(--bordeaux-pale)", "Deuxième relance": "var(--bordeaux)",
+    "En conversation": "var(--amber-pale)", "Appel découverte": "var(--amber)",
+    "En attente de paiement": "#c1440e", "Client": "var(--success)",
+    "Recontacter": "#c7cfdf", "Pas maintenant": "#d8d8d8", "(vide)": "#eee"
+  };
+  const segmentsStatuts = Object.keys(statutCounts).map(s => ({ label: s, value: statutCounts[s], color: paletteStatuts[s] || "#ccc" }));
+
+  const appelsListe = appelsDecouverteListe(prospects, clients);
+  const origineCounts = {};
+  appelsListe.forEach(a => { if (a.origine) origineCounts[a.origine] = (origineCounts[a.origine] || 0) + 1; });
+  const paletteOrigine = ["var(--bordeaux)", "var(--amber)", "var(--success)", "#5b6b85"];
+  const segmentsOrigine = Object.keys(origineCounts).map((o, i) => ({ label: o, value: origineCounts[o], color: paletteOrigine[i % paletteOrigine.length] }));
+
+  const appelsRows = appelsListe.map(a => `
+    <tr>
+      <td>${escapeHtml(a.nom || "")}</td>
+      <td class="muted">${escapeHtml(a.poste || "—")}</td>
+      <td>${escapeHtml(a.temperature || "—")}</td>
+      <td>${escapeHtml(CANAL_LABELS[a.canal] || a.canal || "—")}</td>
+      <td>${escapeHtml(a.origine || "—")}</td>
+      <td>${escapeHtml(a.date || "—")}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <div class="stats">
+      <div class="stat"><div class="stat__value">${prospects.length}</div><div class="stat__label">Prospects en base</div></div>
+      <div class="stat"><div class="stat__value">${funnel.nContactes}</div><div class="stat__label">Contactés (≥1 message)</div></div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div><div class="stat__label">Taux de réponse global</div></div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--success">${funnel.delaiMoyen !== null ? funnel.delaiMoyen + " j" : "—"}</div><div class="stat__label">Délai de réponse moyen ${funnel.nDelais ? "(n=" + funnel.nDelais + ")" : ""}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Répartition du stock (${prospects.length} prospects)</span></div>
+      ${pieChartHtml(segmentsStatuts, 170)}
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Efficacité par message — sur les ${funnel.nContactes} prospects contactés</span></div>
+      <p class="muted" style="margin-bottom:1rem;">Comparaison utile seulement à partir de maintenant : Date de réponse se tamponne automatiquement depuis le 14/08/2026, les prospects traités avant cette date n'ont pas cette donnée rétroactivement.</p>
+      <div class="objectifs-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[0] || 0, funnel.nContactes)}</div><div class="stat__label">Réponse au 1er message</div></div>
+        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[1] || 0, funnel.nbr1Plus)}</div><div class="stat__label">Réponse après relance 1</div></div>
+        <div class="stat"><div class="stat__value">${tauxAvecEffectif(funnel.parEtape[2] || 0, funnel.nbr2Plus)}</div><div class="stat__label">Réponse après relance 2</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil & origine (n=${appelsListe.length})</span></div>
+      ${appelsListe.length < 10 ? `<p class="muted" style="margin-bottom:1rem;">Échantillon encore petit pour dégager un vrai pattern — liste brute ci-dessous en attendant plus de volume.</p>` : ""}
+      ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 130) : `<p class="muted" style="margin-bottom:1rem;">Origine pas encore renseignée — elle se demande automatiquement (popup facultatif) dès qu'un Statut passe à "Appel découverte".</p>`}
+      ${appelsListe.length ? `
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table>
+            <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Date</th></tr></thead>
+            <tbody>${appelsRows}</tbody>
+          </table>
+        </div>
+      ` : `<p class="muted">Aucun appel découverte enregistré pour le moment.</p>`}
+    </div>
+  `;
+}
+
 // Mise a jour optimiste : on applique la valeur localement et on re-rend tout
 // de suite (pas d'attente reseau), au lieu d'appeler loadData(true) qui recharge
 // et reconstruit tout le tableau -- ce plein rebuild, survenant de facon
@@ -1669,6 +1835,12 @@ async function updateField(ligne, champ, valeur) {
   }
   if (basculerVersPremiereRelance) {
     return await updateField(ligne, "statut", "Première relance");
+  }
+  // Popup facultatif (onglet Stats) pour savoir ce qui declenche un appel
+  // decouverte -- ne bloque rien, l'enregistrement du Statut est deja fait
+  // au-dessus ; "Passer" dans le modal laisse juste le champ vide.
+  if (champ === "statut" && valeur === "Appel découverte") {
+    openOrigineAppelModal(ligne);
   }
   return true;
 }
@@ -1760,6 +1932,34 @@ function openHistoriqueModal(ligne) {
 async function submitHistoriqueNote(ligne) {
   const valeur = document.getElementById("m-historique-note").value;
   await updateField(ligne, "note", valeur);
+  closeModal();
+}
+
+// Origine de l'appel decouverte : 4 boutons, zero saisie obligatoire (bouton
+// "Passer" laisse le champ vide). Reutilise le champ "Interet exprime" (O),
+// preexistant mais jamais utilise jusqu'ici -- voir Code.gs. Alimente le
+// camembert "Origine" de l'onglet Stats.
+const ORIGINES_APPEL_DECOUVERTE = [
+  "Après un message/relance direct",
+  "Après un échange de messages",
+  "Le prospect a pris l'initiative",
+  "Suite à un post"
+];
+function openOrigineAppelModal(ligne) {
+  const p = currentData.prospects.find(x => x.ligne === ligne);
+  const nom = p ? p.nom : "";
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Appel découverte${nom ? " — " + escapeHtml(nom) : ""}</h2>
+    <p class="muted" style="margin-bottom:1rem;">Comment s'est déclenché cet appel ? (facultatif — sert juste à repérer ce qui marche dans l'onglet Stats)</p>
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      ${ORIGINES_APPEL_DECOUVERTE.map(o => `<button class="btn btn--ghost" style="text-align:left;" onclick="submitOrigineAppel(${ligne}, '${o.replace(/'/g, "\\'")}')">${escapeHtml(o)}</button>`).join("")}
+    </div>
+    <div class="modal-actions"><button class="btn btn--ghost" onclick="closeModal()">Passer</button></div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitOrigineAppel(ligne, valeur) {
+  await updateField(ligne, "interetExprime", valeur);
   closeModal();
 }
 
