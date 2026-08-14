@@ -15,17 +15,23 @@
 // de relance (Premiere/Deuxieme/Reprise de contact) dont aucun fil n'a ete
 // repere du tout. Le panneau flottant affiche tout ca.
 //
-// Cas ECRITS AUTOMATIQUEMENT (signal fiable, valide par Marie) :
-//  - reponse recue (dernier message du prospect) -> "En conversation"
-//  - fil sans reponse de plus de 6 mois -> "Recontacter"
-//  - "Nouveau"/"A traiter" avec un stade de message identifiable (1er
-//    message / relance 1 / relance 2) -> reclasse en "Premiere relance" ou
-//    "Deuxieme relance" avec Nb relances et la date reelle du dernier envoi
+// Cas ECRITS AUTOMATIQUEMENT (signal fiable, valide par Marie), par ordre de
+// priorite -- l'anciennete du dernier message (quel que soit l'emetteur)
+// passe AVANT tout le reste :
+//  1. dernier message il y a >= 6 mois -> "Recontacter"
+//  2. dernier message il y a >= 2 semaines (et < 6 mois) -> "Pas maintenant"
+//  3. sinon, reponse recue (dernier message du prospect, recent) -> "En
+//     conversation"
+//  4. sinon, "Nouveau"/"A traiter" avec un stade identifiable (1er message /
+//     relance 1 / relance 2) -> reclasse en "Premiere relance" ou "Deuxieme
+//     relance" avec Nb relances et la date reelle du dernier envoi
 // Cas laisses en INFORMATIF SEULEMENT (pas d'ecriture, decision manuelle) :
 //  - stade non identifiable (message reel trop different des signatures
-//    connues) sur un "Nouveau"/"A traiter"
+//    connues) sur un "Nouveau"/"A traiter" recent
 //  - ecart de stade sur un prospect deja etage (Premiere/Deuxieme relance)
 //  - absence totale de fil sur un prospect deja etage
+// "Hors cible" reste un tri 100% manuel fait par Marie au fil de ses actions
+// -- pas automatise ici.
 //
 // Construit le 2026-08-14 a partir de captures d'ecran reelles de la
 // messagerie de Marie (pas de la doc LinkedIn) : chaque ligne de conversation
@@ -186,6 +192,7 @@
       "En conversation": "#15803d",
       "Première relance": "#15803d",
       "Deuxième relance": "#15803d",
+      "Pas maintenant": "#767676",
       "Recontacter": "#5b6b85",
       "Écart détecté": "#b8824a",
       "À vérifier manuellement": "#b8824a",
