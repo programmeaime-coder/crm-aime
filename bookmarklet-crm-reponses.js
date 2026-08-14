@@ -45,9 +45,31 @@
 
 (function () {
   var URL_BASE = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
+
+  // Memorise les fils deja envoyes a matcherReponses (localStorage, cote
+  // linkedin.com, persiste entre les sessions) -- avec potentiellement
+  // 1000-2000 conversations a couvrir, Marie va relancer ce bookmarklet
+  // plusieurs fois ; sans ca, chaque run re-scrollerait et re-enverrait les
+  // memes conversations recentes deja traitees avant d'atteindre du nouveau
+  // territoire. Un fil deja reclasse (Recontacter/Pas maintenant/etc.) sort
+  // de toute facon du pool de candidats cote serveur (voir Code.gs,
+  // STATUTS_ELIGIBLES_TRI) -- ce cache evite juste le gaspillage de temps de
+  // defilement et d'appels reseau, ce n'est pas une garantie de correction.
+  var CLE_STOCKAGE = "crmaime_reponses_traitees";
+  function chargerTraites() {
+    try { return JSON.parse(localStorage.getItem(CLE_STOCKAGE) || "[]").reduce(function (acc, h) { acc[h] = true; return acc; }, {}); }
+    catch (err) { return {}; }
+  }
+  function sauvegarderTraites(map) {
+    try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(Object.keys(map))); } catch (err) {}
+  }
+  var dejaTraites = chargerTraites();
+  var nouveauxHrefs = [];
+  var ignoresDejaTraites = 0;
+
   var pwd = prompt("Mot de passe du CRM ?", "");
   if (pwd === null) return;
-  var reponse = prompt("Combien de paliers de defilement ? (chaque palier ~= quelques conversations ; monter haut (ex. 100+) pour couvrir plusieurs mois d'historique)", "60");
+  var reponse = prompt("Combien de paliers de defilement ? (chaque palier ~= quelques conversations ; monter haut (ex. 100+) pour couvrir plusieurs mois d'historique -- les conversations deja traitees lors d'un run precedent sont ignorees automatiquement)", "60");
   if (reponse === null) return;
   var PALIERS = parseInt(reponse, 10);
   if (!PALIERS || PALIERS < 1) PALIERS = 60;
@@ -144,8 +166,10 @@
     document.querySelectorAll('a[href*="/messaging/thread/"]').forEach(function (a) {
       var href = a.href.split("?")[0];
       if (vus[href]) return;
+      if (dejaTraites[href]) { vus[href] = true; ignoresDejaTraites++; return; }
       var conv = extraireConversation(a);
       if (!conv) return;
+      nouveauxHrefs.push(href);
       vus[href] = true;
       conversations.push(conv);
     });
@@ -175,6 +199,13 @@
     fermer.onclick = function () { panneau.remove(); };
     entete.appendChild(fermer);
     panneau.appendChild(entete);
+
+    if (ignoresDejaTraites > 0) {
+      var noteCache = document.createElement("p");
+      noteCache.style.cssText = "color:#767676;font-size:12px;margin-bottom:12px;";
+      noteCache.textContent = ignoresDejaTraites + " conversation(s) ignorée(s) — déjà traitées lors d'un run précédent.";
+      panneau.appendChild(noteCache);
+    }
 
     if (suggestions.length === 0) {
       var vide = document.createElement("p");
@@ -230,6 +261,14 @@
   }
 
   function envoyer() {
+    // Persiste des maintenant (avant meme l'envoi reseau) : le but est
+    // d'eviter de re-scroller ces conversations au prochain run, pas de
+    // garantir que l'ecriture serveur a reussi -- si un fil n'a rien donne
+    // de nouveau, le re-scanner plus tard ne changerait rien tant que Marie
+    // n'a pas agi dessus autrement.
+    nouveauxHrefs.forEach(function (h) { dejaTraites[h] = true; });
+    sauvegarderTraites(dejaTraites);
+
     if (conversations.length === 0) {
       afficherPanneau([], 0);
       return;
