@@ -570,7 +570,14 @@ function nextRelance(p) {
 const DECISION_CONFIG = {
   "Deuxième relance": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
   "Reprise de contact": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
-  "Appel découverte": { dateChamp: "dateAppelDecouverte", delaiJours: 1, boutons: ["Devient cliente", "Pas maintenant", "Hors cible"], libelle: j => `À décider (appel il y a ${j}j)` }
+  "Appel découverte": { dateChamp: "dateAppelDecouverte", delaiJours: 1, boutons: ["Devient cliente", "Pas maintenant", "Hors cible"], libelle: j => `À décider (appel il y a ${j}j)` },
+  // Verifie regulierement qu'une conversation "active" l'est encore -- 3
+  // options (pas juste "Pas maintenant") car une conversation qui traine peut
+  // aussi bien reveler que le profil n'est pas la cible, ou justifier un
+  // vrai suivi date plutot qu'un simple archivage. dateChamp = dateReponse,
+  // deja tamponnee automatiquement des le passage en "En conversation" (voir
+  // Code.gs, marquerReponseRecueDepuisReconciliation et STATUTS_REPONSE).
+  "En conversation": { dateChamp: "dateReponse", delaiJours: 7, boutons: ["Pas maintenant", "Recontacter", "Hors cible"], libelle: j => `À revérifier (${j}j en conversation)` }
 };
 function joursEcoules(dateStr) {
   const d = parseFrDate(dateStr);
