@@ -1672,13 +1672,20 @@ function statsFunnelData(prospects) {
   });
   const delais = contactes.map(p => Number(p.delaiReponse)).filter(d => !isNaN(d) && d > 0);
   const delaiMoyen = delais.length ? Math.round(delais.reduce((a, b) => a + b, 0) / delais.length) : null;
+  // En attente par etape (jamais repondu, encore dans le cycle de relance) --
+  // alimente le camembert "reponses" de l'onglet Stats, plus utile que la
+  // repartition brute du Statut (ecrasee par les milliers de "Nouveau").
+  const enAttente0 = contactes.filter(p => !p.dateReponse && (Number(p.nbRelances) || 0) === 0).length;
+  const enAttente1 = contactes.filter(p => !p.dateReponse && (Number(p.nbRelances) || 0) === 1).length;
+  const enAttente2 = contactes.filter(p => !p.dateReponse && (Number(p.nbRelances) || 0) === 2).length;
   return {
     nContactes: contactes.length,
     nbr1Plus, nbr2Plus,
     nRepondus: repondus.length,
     parEtape,
     delaiMoyen,
-    nDelais: delais.length
+    nDelais: delais.length,
+    enAttente0, enAttente1, enAttente2
   };
 }
 
@@ -1704,18 +1711,6 @@ function renderStatsSection(data) {
   const prospects = data.prospects;
   const clients = data.clients;
   const funnel = statsFunnelData(prospects);
-
-  const statutCounts = {};
-  prospects.forEach(p => { const s = p.statut || "(vide)"; statutCounts[s] = (statutCounts[s] || 0) + 1; });
-  const paletteStatuts = {
-    "Nouveau": "#f0f0f0", "À traiter": "#fdf0d5", "Hors cible": "#e5e5e5",
-    "En attente de connexion": "#e3edfa", "Reprise de contact": "#c8ebe4",
-    "Première relance": "var(--bordeaux-pale)", "Deuxième relance": "var(--bordeaux)",
-    "En conversation": "var(--amber-pale)", "Appel découverte": "var(--amber)",
-    "En attente de paiement": "#c1440e", "Client": "var(--success)",
-    "Recontacter": "#c7cfdf", "Pas maintenant": "#d8d8d8", "(vide)": "#eee"
-  };
-  const segmentsStatuts = Object.keys(statutCounts).map(s => ({ label: s, value: statutCounts[s], color: paletteStatuts[s] || "#ccc" }));
 
   const appelsListe = appelsDecouverteListe(prospects, clients);
   const origineCounts = {};
@@ -1743,8 +1738,14 @@ function renderStatsSection(data) {
     </div>
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Répartition du stock (${prospects.length} prospects)</span></div>
-      ${pieChartHtml(segmentsStatuts, 170)}
+      <div class="section__head"><span class="section__eyebrow">Réponses — sur les ${funnel.nContactes} prospects contactés</span></div>
+      ${pieChartHtml([
+        { label: "A répondu", value: funnel.nRepondus, color: "var(--success)" },
+        { label: "En attente (avant relance 1)", value: funnel.enAttente0, color: "var(--bordeaux-pale)" },
+        { label: "En attente (avant relance 2)", value: funnel.enAttente1, color: "var(--bordeaux-mid)" },
+        { label: "2 relances envoyées, sans réponse", value: funnel.enAttente2, color: "var(--bordeaux)" }
+      ], 170)}
+      <p class="muted" style="margin-top:1rem;">Stock non travaillé (hors de ce calcul) : ${prospects.length - funnel.nContactes} prospects — dont ${(prospects.filter(p => p.statut === "Nouveau").length)} "Nouveau" jamais triés, ${(prospects.filter(p => p.statut === "À traiter").length)} "À traiter", ${(prospects.filter(p => p.statut === "Hors cible").length)} "Hors cible".</p>
     </div>
 
     <div class="section">
