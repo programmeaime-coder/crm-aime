@@ -62,6 +62,22 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .section__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.5px solid var(--border); }
 .section__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
 
+.toolbar { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid var(--border); }
+.toolbar__row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.toolbar__row--actions { justify-content: flex-end; }
+.toolbar .btn, .toolbar .recherche-input, .toolbar .filtre-select {
+  height: 36px; box-sizing: border-box; white-space: nowrap;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  border: 0.5px solid var(--border); border-radius: 0;
+}
+.toolbar .recherche-input, .toolbar .filtre-select { font-weight: 400; padding: 0 0.75rem; background: #fff; color: var(--text); }
+.filtre-select {
+  max-width: 200px; cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23767676'/></svg>");
+  background-repeat: no-repeat; background-position: right 0.75rem center; padding-right: 1.75rem;
+}
+.toolbar .recherche-input:focus, .filtre-select:focus { outline: none; border-color: var(--bordeaux); }
+
 .rappels-relances-grid { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--border); border: 0.5px solid var(--border); }
 .rappels-relances-box { padding: 1.25rem 1.5rem; }
 .rappels-relances-box--relances { background: var(--bordeaux-pale); }
@@ -867,8 +883,10 @@ function rappelsADemainHtml(prospects, obj) {
 
   const groupeDeuxieme = deuxiemeADecider.length ? `
     <div class="rappel-groupe" style="margin-top:0.75rem;">
-      <p class="muted" style="margin-bottom:0.4rem;"><b>Deuxième relance J+7</b></p>
-      <div class="rappels-list">${deuxiemeADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
+      <div class="rappel-item rappel-item--block">
+        <div><b>${deuxiemeADecider.length} en deuxième relance (J+7)</b></div>
+        <div>${deuxiemeADecider.map(p => `${escapeHtml(p.nom)} (${joursEcoules(p.dateEntreeStatutRelance)}j)`).join(", ")}</div>
+      </div>
     </div>` : "";
 
   return groupeAppel + groupeReprise + groupeDeuxieme;
@@ -1439,15 +1457,16 @@ function renderProspectsSection(prospects) {
 
   return `
     <div class="section">
-      <div class="section__head">
-        <span class="section__eyebrow">Prospects</span>
-        <div style="display:flex;gap:0.75rem;align-items:center;">
+      <div class="toolbar">
+        <div class="toolbar__row">
           <input type="search" id="recherche-prospects" class="recherche-input" placeholder="Rechercher un nom…" value="${escapeHtml(rechercheTexte)}" oninput="onRechercheInput(this)">
-          <select class="note-input" style="max-width:200px;" onchange="onFiltreStatutChange(this)">
+          <select class="filtre-select" onchange="onFiltreStatutChange(this)">
             <option value="">Tous les statuts</option>
             ${STATUT_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === filtreStatut ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}
           </select>
           ${btnNouveau}${btnHorsCible}${btnATraiter}
+        </div>
+        <div class="toolbar__row toolbar__row--actions">
           <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
           <button class="btn btn--ghost" onclick="ouvrirRafalePremiersMessages()">Rafale : premiers messages</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>

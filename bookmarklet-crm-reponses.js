@@ -34,14 +34,18 @@
 // -- pas automatise ici.
 //
 // Construit le 2026-08-14 a partir de captures d'ecran reelles de la
-// messagerie de Marie (pas de la doc LinkedIn) : chaque ligne de conversation
-// affiche "{Nom}{Date}{Emetteur} : {extrait}", ou Emetteur vaut "Vous" (elle a
-// envoye en dernier, toujours en attente) ou le prenom du prospect (il/elle a
-// repondu en dernier). C'est ce couple (Vous vs prenom) + la date qui permet
-// de classifier sans ambiguite qui a la balle. Les selecteurs DOM eux-memes
-// restent une estimation (pas de HTML brut inspecte, seulement des captures
-// visuelles) -- si le premier essai capture 0 conversation ou des noms
-// visiblement faux, c'est le point a corriger en premier (voir extraireConversation).
+// messagerie de Marie (pas de la doc LinkedIn), puis CORRIGE le 2026-08-15
+// apres un premier test en conditions reelles qui n'a capture 0 conversation
+// -- LinkedIn n'utilise plus de <a href="/messaging/thread/...">  dans la
+// liste (verifie en direct sur linkedin.com/messaging/ via l'extension
+// Claude in Chrome) : chaque ligne est un <li class="msg-conversation-listitem">
+// sans lien reel, dont le nom/date/dernier message vivent dans trois
+// elements separes (voir extraireConversation). Chaque ligne de conversation
+// affiche "{Nom}" / "{Date}" / "{Emetteur} : {extrait}" (ou "{Emetteur} a
+// envoye une piece jointe" pour les messages non textuels), ou Emetteur vaut
+// "Vous" (elle a envoye en dernier, toujours en attente) ou le prenom du
+// prospect (il/elle a repondu en dernier). C'est ce couple (Vous vs prenom) +
+// la date qui permet de classifier sans ambiguite qui a la balle.
 
 (function () {
   var URL_BASE = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
@@ -55,6 +59,12 @@
   // de toute facon du pool de candidats cote serveur (voir Code.gs,
   // STATUTS_ELIGIBLES_TRI) -- ce cache evite juste le gaspillage de temps de
   // defilement et d'appels reseau, ce n'est pas une garantie de correction.
+  // Cle : pas de href stable disponible (voir collecter/extraireConversation
+  // -- LinkedIn ne rend plus la liste avec de vrais liens), donc nom+date+
+  // debut du dernier message. Best-effort seulement : si le texte affiche
+  // change (nouveau message, date qui glisse de "hier" a "2j"), la meme
+  // conversation peut se represente et se renvoyer -- sans consequence, cote
+  // serveur matcherReponses ecrase juste la meme ligne avec le meme resultat.
   var CLE_STOCKAGE = "crmaime_reponses_traitees";
   function chargerTraites() {
     try { return JSON.parse(localStorage.getItem(CLE_STOCKAGE) || "[]").reduce(function (acc, h) { acc[h] = true; return acc; }, {}); }
@@ -63,8 +73,11 @@
   function sauvegarderTraites(map) {
     try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(Object.keys(map))); } catch (err) {}
   }
+  function clefConversation(nom, date, extrait) {
+    return nom + "||" + date + "||" + (extrait || "").slice(0, 40);
+  }
   var dejaTraites = chargerTraites();
-  var nouveauxHrefs = [];
+  var nouvellesClefs = [];
   var ignoresDejaTraites = 0;
 
   var pwd = prompt("Mot de passe du CRM ?", "");
@@ -91,8 +104,6 @@
       .replace(/\s{2,}/g, " ")
       .trim();
   }
-
-  var RE_DATE = /(aujourd['’]hui|hier|il y a \d+\s*(?:j|jour|jours|sem|semaine|semaines|mois)|\d{1,2}\s*(?:janv|f[ée]vr|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)\.?(?:\s*\d{4})?|\d{1,2}:\d{2})/i;
 
   // Estimation de la date reelle (et de l'anciennete en jours) du dernier
   // message, a partir du texte de date affiche par LinkedIn -- sert au seuil
@@ -135,42 +146,64 @@
     return { ageJours: null, dateISO: null };
   }
 
-  // Le texte complet de la ligne (nom + date + emetteur + extrait, sans
-  // separateur garanti) est decoupe en trois : tout AVANT la date = nom,
-  // juste APRES la date jusqu'au premier ":" = emetteur ("Vous" ou le prenom
-  // du prospect), le reste = extrait du dernier message.
-  function extraireConversation(a) {
-    var texte = (a.textContent || "").replace(/\s+/g, " ").trim();
-    if (!texte) return null;
-    var mDate = texte.match(RE_DATE);
-    if (!mDate) return null;
-    var nom = nettoyerBoilerplate(texte.slice(0, mDate.index));
+  // Nom, date et dernier message vivent dans trois elements separes de la
+  // ligne (verifie le 2026-08-15 sur le DOM reel, voir commentaire d'entete) :
+  //  - [class*="participant-names"] : nom du/des participant(s)
+  //  - [class*="time-stamp"]        : date/heure du dernier message
+  //  - [class*="message-snippet"]   : "{Emetteur} : {extrait}" pour un
+  //    message texte, ou "{Emetteur} a envoye une piece jointe"/"a reagi"/...
+  //    pour un contenu non textuel (pas de ":"). Emetteur vaut "Vous" ou le
+  //    prenom du prospect dans les deux cas.
+  function extraireConversation(li) {
+    var nomEl = li.querySelector('[class*="participant-names"]');
+    var dateEl = li.querySelector('[class*="time-stamp"]');
+    var snippetEl = li.querySelector('[class*="message-snippet"]');
+    if (!nomEl || !dateEl) return null;
+    var nom = nettoyerBoilerplate((nomEl.textContent || "").replace(/\s+/g, " ").trim());
     if (!nom || nom.length > 60) return null;
-    var apres = texte.slice(mDate.index + mDate[0].length);
-    var mColon = apres.match(/^\s*([^:]{1,40}?)\s*:\s*(.*)$/);
-    if (!mColon) return null;
-    var emetteur = mColon[1].trim();
-    var extrait = mColon[2].trim().slice(0, 140);
-    var parsed = parseDateLinkedIn(mDate[0]);
+    var dateTexte = (dateEl.textContent || "").replace(/\s+/g, " ").trim();
+    if (!dateTexte) return null;
+    var snippet = (snippetEl ? snippetEl.textContent : "").replace(/\s+/g, " ").trim();
+
+    var emetteur = null;
+    var extrait = snippet;
+    var mColon = snippet.match(/^([^:]{1,40}?)\s*:\s*(.*)$/);
+    if (mColon) {
+      emetteur = mColon[1].trim();
+      extrait = mColon[2].trim().slice(0, 140);
+    } else {
+      // Pas de ":" -- message non textuel ("X a envoye une piece jointe", "X
+      // a reagi a...", etc.). Le premier mot est l'emetteur ("Vous" ou le
+      // prenom), le reste sert d'extrait informatif (jamais compare aux
+      // signatures de stade cote serveur, qui portent sur du texte reel).
+      var mAction = snippet.match(/^(\S+)\s+(a\s|vous\s)/i);
+      if (mAction) emetteur = mAction[1].trim();
+      extrait = snippet.slice(0, 140);
+    }
+
+    var parsed = parseDateLinkedIn(dateTexte);
     return {
       nom: nom,
-      date: mDate[0],
+      date: dateTexte,
       ageJours: parsed.ageJours,
       dateISO: parsed.dateISO,
-      dernierEnvoyeurEstMarie: /^vous$/i.test(emetteur),
+      // null (emetteur non identifie) plutot que de deviner -- seul un
+      // "false" explicite declenche la reconciliation automatique "reponse
+      // recue" cote serveur (voir Code.gs, matcherReponses).
+      dernierEnvoyeurEstMarie: emetteur ? /^vous$/i.test(emetteur) : null,
       extrait: extrait
     };
   }
 
   function collecter() {
-    document.querySelectorAll('a[href*="/messaging/thread/"]').forEach(function (a) {
-      var href = a.href.split("?")[0];
-      if (vus[href]) return;
-      if (dejaTraites[href]) { vus[href] = true; ignoresDejaTraites++; return; }
-      var conv = extraireConversation(a);
+    document.querySelectorAll("li.msg-conversation-listitem").forEach(function (li) {
+      var conv = extraireConversation(li);
       if (!conv) return;
-      nouveauxHrefs.push(href);
-      vus[href] = true;
+      var clef = clefConversation(conv.nom, conv.date, conv.extrait);
+      if (vus[clef]) return;
+      if (dejaTraites[clef]) { vus[clef] = true; ignoresDejaTraites++; return; }
+      nouvellesClefs.push(clef);
+      vus[clef] = true;
       conversations.push(conv);
     });
   }
@@ -266,7 +299,7 @@
     // garantir que l'ecriture serveur a reussi -- si un fil n'a rien donne
     // de nouveau, le re-scanner plus tard ne changerait rien tant que Marie
     // n'a pas agi dessus autrement.
-    nouveauxHrefs.forEach(function (h) { dejaTraites[h] = true; });
+    nouvellesClefs.forEach(function (c) { dejaTraites[c] = true; });
     sauvegarderTraites(dejaTraites);
 
     if (conversations.length === 0) {
