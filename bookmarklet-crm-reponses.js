@@ -326,8 +326,18 @@
       afficherPanneau([], 0);
       return;
     }
+    // Taille de paquet limitee a 10 (pas 40) : chaque conversation embarque
+    // jusqu'a 140 caracteres d'extrait, et l'appel part en GET (donnees dans
+    // l'URL, pas en POST) -- avec des accents francais qui gonflent sous
+    // encodeURIComponent, un paquet de 40 produit une URL de ~18000
+    // caracteres, au-dela de ce que les serveurs Google acceptent en entete
+    // de requete (verifie en conditions reelles : erreur "400 -- Votre
+    // client a emis une demande mal formee", qui vient du frontend Google,
+    // pas du script -- Code.gs ne recoit meme pas la requete). Avec 10, on
+    // reste a ~4600 caracteres.
+    var TAILLE_PAQUET = 10;
     var paquets = [];
-    for (var i = 0; i < conversations.length; i += 40) paquets.push(conversations.slice(i, i + 40));
+    for (var i = 0; i < conversations.length; i += TAILLE_PAQUET) paquets.push(conversations.slice(i, i + TAILLE_PAQUET));
     var suggestions = [];
     var lignesTrouvees = [];
     var recus = 0, termine = false;
