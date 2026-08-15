@@ -195,6 +195,26 @@
     };
   }
 
+  // LinkedIn charge la liste par occlusion (les <li> hors viewport sont des
+  // coquilles vides, classe "msg-conversation-card--occluded", tant qu'on ne
+  // scrolle pas) -- MAIS la page elle-meme ne defile jamais (verifie en
+  // direct : document.documentElement.scrollHeight === clientHeight, mise en
+  // page fixe). Le vrai conteneur scrollable est le <ul> ancetre du premier
+  // <li>, plus haut dans l'arbre (verifie : scrollHeight 1888 vs clientHeight
+  // 572, overflow-y:auto). window.scrollBy ne fait donc rien et plafonne la
+  // capture aux ~10 conversations deja visibles au chargement -- cette
+  // fonction retrouve dynamiquement ce conteneur (pas de classe fixee en dur,
+  // pour survivre aux prochains changements de nom de classe LinkedIn).
+  function conteneurListe() {
+    var li = document.querySelector("li.msg-conversation-listitem");
+    var el = li ? li.parentElement : null;
+    while (el && el !== document.body) {
+      if (el.scrollHeight > el.clientHeight + 2) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
   function collecter() {
     document.querySelectorAll("li.msg-conversation-listitem").forEach(function (li) {
       var conv = extraireConversation(li);
@@ -360,13 +380,15 @@
   }
 
   var palier = 0;
+  var conteneur = null;
   function etape() {
     collecter();
     if (palier >= PALIERS) {
       envoyer();
       return;
     }
-    window.scrollBy(0, PAS);
+    if (!conteneur) conteneur = conteneurListe();
+    if (conteneur) conteneur.scrollBy(0, PAS); else window.scrollBy(0, PAS);
     palier++;
     setTimeout(etape, DELAI);
   }
