@@ -24,6 +24,27 @@
   --surface: #faf8f5;
   --success: #15803d;
   --success-pale: #eef7f0;
+
+  /* Palette graphiques Stats -- volontairement hors de la gamme rouge/bordeaux
+     de l'identite (reservee aux boutons/nav), pour que chaque serie/etape se
+     distingue au premier coup d'oeil au lieu d'un mur de barres bordeaux
+     identiques. Verifiee via le validateur de palette (skill dataviz) : les
+     4 teintes categorielles passent tous les checks CVD/contraste sur fond
+     blanc (#fff, surface des cartes .section) ; la rampe bleue est une seule
+     teinte a luminosite degressive (encodage ordinal, l'ordre = l'etape).
+     Chaud/tiede/froid reutilise l'ambre existant en rampe ordinale 3 pas. */
+  --viz-blue-1: #86b6ef;
+  --viz-blue-2: #5598e7;
+  --viz-blue-3: #2a78d6;
+  --viz-blue-4: #1c5cab;
+  --viz-blue-5: #0d366b;
+  --viz-cat-amber: #b8722a;
+  --viz-cat-blue: #1a6fb0;
+  --viz-cat-plum: #a13a80;
+  --viz-cat-teal: #1a8f7d;
+  --viz-temp-froid: #c99958;
+  --viz-temp-tiede: #b8722a;
+  --viz-temp-chaud: #7a3a12;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,6 +313,24 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .funnel-row__track { background: var(--border); height: 22px; }
 .funnel-row__bar { background: var(--bordeaux); height: 100%; transition: width 0.3s; }
 .funnel-row__note { font-size: 12px; margin-top: 3px; }
+
+/* ─── Stats : sous-blocs de graphiques ─── */
+.viz-block { margin-bottom: 2.25rem; }
+.viz-block:last-child { margin-bottom: 0; }
+.viz-block__title { font-size: 13.5px; font-weight: 600; margin-bottom: 0.9rem; }
+.viz-row { display: flex; gap: 2.5rem; flex-wrap: wrap; align-items: flex-start; }
+.viz-row > .viz-block { flex: 1 1 320px; }
+
+.taux-row { display: flex; flex-direction: column; gap: 0.9rem; }
+.taux-row__item { display: flex; align-items: center; gap: 0.9rem; }
+.taux-row__label { flex: 0 0 152px; font-size: 12.5px; }
+.taux-row__track { flex: 1 1 auto; background: var(--border); height: 20px; position: relative; }
+.taux-row__bar { height: 100%; transition: width 0.3s; }
+.taux-row__bar--muted { background: repeating-linear-gradient(135deg, var(--border), var(--border) 4px, #d4d2cc 4px, #d4d2cc 8px); }
+.taux-row__value { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; min-width: 92px; text-align: right; }
+.taux-row__value .muted { font-weight: 400; }
+
+.appels-detail-toggle { margin-top: 1rem; }
 
 .loading-msg { text-align: center; padding: 4rem; color: var(--text-muted); font-size: 13px; }
 
@@ -1315,6 +1354,7 @@ async function submitObjectifs() {
 let afficherNouveau = false;
 let afficherHorsCible = false;
 let afficherATraiter = false;
+let afficherDetailAppels = false;
 let filtreStatut = "";
 const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant", "À traiter"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
@@ -1389,6 +1429,10 @@ function toggleAfficherHorsCible() {
 }
 function toggleAfficherATraiter() {
   afficherATraiter = !afficherATraiter;
+  render(currentData);
+}
+function toggleAfficherDetailAppels() {
+  afficherDetailAppels = !afficherDetailAppels;
   render(currentData);
 }
 function onFiltreStatutChange(select) {
@@ -1708,7 +1752,7 @@ function funnelHtml(etapes) {
               <span class="funnel-row__label">${escapeHtml(e.label)}</span>
               <span class="funnel-row__value">${e.valeur} <span class="muted">(${pct}%)</span></span>
             </div>
-            <div class="funnel-row__track"><div class="funnel-row__bar" style="width:${largeur}%"></div></div>
+            <div class="funnel-row__track"><div class="funnel-row__bar" style="width:${largeur}%;background:${e.color || "var(--bordeaux)"}"></div></div>
             ${e.note ? `<div class="funnel-row__note muted">${e.note}</div>` : ""}
           </div>
         `;
@@ -1767,6 +1811,39 @@ function appelsDecouverteListe(prospects, clients) {
   return items;
 }
 
+const STAGE_COLORS = ["var(--viz-blue-1)", "var(--viz-blue-2)", "var(--viz-blue-3)", "var(--viz-blue-4)", "var(--viz-blue-5)"];
+const TEMP_ORDER_DONUT = ["Froid", "Tiède", "Chaud"];
+const TEMP_COLORS = { "Froid": "var(--viz-temp-froid)", "Tiède": "var(--viz-temp-tiede)", "Chaud": "var(--viz-temp-chaud)" };
+const PALETTE_ORIGINE = ["var(--viz-cat-amber)", "var(--viz-cat-blue)", "var(--viz-cat-plum)", "var(--viz-cat-teal)"];
+
+// En dessous de ce seuil, une barre de taux de reponse est affichee en
+// hachures grises plutot qu'en couleur pleine (voir reponseParEtapeHtml) --
+// tout debut du suivi (actif depuis le 14/08/2026), 1-2 cas donneraient un
+// 0%/100% qui se lirait comme un signal fort alors que ce n'en est pas un.
+const SEUIL_FIABLE_TAUX = 5;
+
+// Graphique dedie au taux de reponse par etape ("efficacite de mes messages"),
+// separe du funnel de volume ci-dessous -- avant, ce chiffre etait relegue en
+// petite note grise sous chaque barre du funnel, invisible au premier regard.
+function reponseParEtapeHtml(rows) {
+  return `
+    <div class="taux-row">
+      ${rows.map(r => {
+        const fiable = r.den >= SEUIL_FIABLE_TAUX;
+        const pct = r.den ? Math.round((r.num / r.den) * 100) : 0;
+        const largeur = r.den ? Math.max(2, pct) : 0;
+        return `
+          <div class="taux-row__item">
+            <span class="taux-row__label">${escapeHtml(r.label)}</span>
+            <div class="taux-row__track"><div class="taux-row__bar ${fiable ? "" : "taux-row__bar--muted"}" style="width:${largeur}%;${fiable ? `background:${r.color}` : ""}"></div></div>
+            <span class="taux-row__value">${r.den ? pct + "%" : "—"} <span class="muted">(${r.num}/${r.den})</span></span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderStatsSection(data) {
   const prospects = data.prospects;
   const clients = data.clients;
@@ -1775,8 +1852,16 @@ function renderStatsSection(data) {
   const appelsListe = appelsDecouverteListe(prospects, clients);
   const origineCounts = {};
   appelsListe.forEach(a => { if (a.origine) origineCounts[a.origine] = (origineCounts[a.origine] || 0) + 1; });
-  const paletteOrigine = ["var(--bordeaux)", "var(--amber)", "var(--success)", "#5b6b85"];
-  const segmentsOrigine = Object.keys(origineCounts).map((o, i) => ({ label: o, value: origineCounts[o], color: paletteOrigine[i % paletteOrigine.length] }));
+  const segmentsOrigine = Object.keys(origineCounts).map((o, i) => ({ label: o, value: origineCounts[o], color: PALETTE_ORIGINE[i % PALETTE_ORIGINE.length] }));
+
+  // Repartition Chaud/Tiede/Froid parmi les appels decouverte : proxy direct
+  // de "a quel point ces gens correspondent a ma cible", deja saisi par Marie
+  // sur chaque prospect (colonne Temperature), aucune nouvelle donnee requise.
+  // Les clients n'ont pas de temperature enregistree (deja converti) -- exclus
+  // naturellement puisque leur champ est vide.
+  const tempCounts = {};
+  appelsListe.forEach(a => { if (a.temperature) tempCounts[a.temperature] = (tempCounts[a.temperature] || 0) + 1; });
+  const segmentsTemp = TEMP_ORDER_DONUT.filter(t => tempCounts[t]).map(t => ({ label: t, value: tempCounts[t], color: TEMP_COLORS[t] }));
 
   // "Pourquoi ça bloque" : parmi les appels decouverte qui n'ont PAS signe,
   // repartition par issue reelle (deja disponible via le Statut actuel du
@@ -1810,29 +1895,59 @@ function renderStatsSection(data) {
     </div>
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Funnel — où est-ce que ça bloque ?</span></div>
-      <p class="muted" style="margin-bottom:1rem;">Comparaison utile seulement à partir de maintenant : Date de réponse se tamponne automatiquement depuis le 14/08/2026, les prospects traités avant cette date n'ont pas cette donnée rétroactivement.</p>
-      ${funnelHtml([
-        { label: "Contactés (1er message envoyé)", valeur: funnel.nContactes, base: funnel.nContactes, note: null },
-        { label: "Relance 1 envoyée", valeur: funnel.nbr1Plus, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[0] || 0, funnel.nContactes) + " ont répondu au 1er message" },
-        { label: "Relance 2 envoyée", valeur: funnel.nbr2Plus, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[1] || 0, funnel.nbr1Plus) + " ont répondu après la relance 1" },
-        { label: "Appel découverte", valeur: appelsListe.length, base: funnel.nContactes, note: tauxAvecEffectif(funnel.parEtape[2] || 0, funnel.nbr2Plus) + " ont répondu après la relance 2 — " + tauxAvecEffectif(appelsListe.length, funnel.nRepondus) + " des réponses (tous stades) débouchent sur un appel" },
-        { label: "Client", valeur: clients.length, base: funnel.nContactes, note: tauxAvecEffectif(clients.length, appelsListe.length) + " des appels découverte signent" }
-      ])}
+      <div class="section__head"><span class="section__eyebrow">Efficacité de mes messages</span></div>
+
+      <div class="viz-block">
+        <div class="viz-block__title">Volume par étape</div>
+        ${funnelHtml([
+          { label: "Contactés (1er message envoyé)", valeur: funnel.nContactes, base: funnel.nContactes, note: null, color: STAGE_COLORS[0] },
+          { label: "Relance 1 envoyée", valeur: funnel.nbr1Plus, base: funnel.nContactes, note: null, color: STAGE_COLORS[1] },
+          { label: "Relance 2 envoyée", valeur: funnel.nbr2Plus, base: funnel.nContactes, note: null, color: STAGE_COLORS[2] },
+          { label: "Appel découverte", valeur: appelsListe.length, base: funnel.nContactes, note: null, color: STAGE_COLORS[3] },
+          { label: "Client", valeur: clients.length, base: funnel.nContactes, note: null, color: STAGE_COLORS[4] }
+        ])}
+      </div>
+
+      <div class="viz-block">
+        <div class="viz-block__title">Taux de réponse par étape</div>
+        <p class="muted" style="margin-bottom:0.9rem;">Suivi actif depuis le 14/08/2026 — barres grisées = pas encore assez de cas (n&lt;${SEUIL_FIABLE_TAUX}) pour être fiables.</p>
+        ${reponseParEtapeHtml([
+          { label: "Après 1er message", num: funnel.parEtape[0] || 0, den: funnel.nContactes, color: STAGE_COLORS[1] },
+          { label: "Après relance 1", num: funnel.parEtape[1] || 0, den: funnel.nbr1Plus, color: STAGE_COLORS[2] },
+          { label: "Après relance 2", num: funnel.parEtape[2] || 0, den: funnel.nbr2Plus, color: STAGE_COLORS[3] }
+        ])}
+        <p class="muted" style="margin-top:0.9rem;">${tauxAvecEffectif(appelsListe.length, funnel.nRepondus)} des réponses (tous stades) débouchent sur un appel — ${tauxAvecEffectif(appelsListe.length - appelsNonSignes.length, appelsListe.length)} des appels découverte signent.</p>
+      </div>
     </div>
 
     <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil, origine & pourquoi ça bloque (n=${appelsListe.length})</span></div>
-      ${appelsListe.length < 10 ? `<p class="muted" style="margin-bottom:1rem;">Échantillon encore petit pour dégager un vrai pattern — liste brute ci-dessous en attendant plus de volume.</p>` : ""}
-      ${appelsNonSignes.length ? `<p style="margin-bottom:1rem;">Sur ${appelsListe.length} appels : <b>${appelsListe.length - appelsNonSignes.length}</b> ont signé, ${appelsNonSignes.length} non — ${resumeIssues}.</p>` : ""}
-      ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 130) : `<p class="muted" style="margin-bottom:1rem;">Origine pas encore renseignée — elle se demande automatiquement (popup facultatif) dès qu'un Statut passe à "Appel découverte".</p>`}
-      ${appelsListe.length ? `
-        <div class="table-wrap" style="margin-top:1rem;">
-          <table>
-            <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Date</th><th>Résultat</th></tr></thead>
-            <tbody>${appelsRows}</tbody>
-          </table>
+      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil & pertinence (n=${appelsListe.length})</span></div>
+      ${appelsListe.length < 10 ? `<p class="muted" style="margin-bottom:1rem;">Échantillon encore petit pour dégager un vrai pattern.</p>` : ""}
+      ${appelsNonSignes.length ? `<p style="margin-bottom:1.25rem;">Sur ${appelsListe.length} appels : <b>${appelsListe.length - appelsNonSignes.length}</b> ont signé, ${appelsNonSignes.length} non — ${resumeIssues}.</p>` : ""}
+
+      <div class="viz-row">
+        <div class="viz-block">
+          <div class="viz-block__title">Température (correspondance à la cible)</div>
+          ${segmentsTemp.length ? pieChartHtml(segmentsTemp, 150) : `<p class="muted">Température pas encore renseignée sur ces appels.</p>`}
         </div>
+        <div class="viz-block">
+          <div class="viz-block__title">Origine de la demande</div>
+          ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 150) : `<p class="muted">Origine pas encore renseignée — elle se demande automatiquement (popup facultatif) dès qu'un Statut passe à "Appel découverte".</p>`}
+        </div>
+      </div>
+
+      ${appelsListe.length ? `
+        <div class="appels-detail-toggle">
+          <button class="btn btn--ghost" onclick="toggleAfficherDetailAppels()">${afficherDetailAppels ? "Masquer" : "Voir"} le détail (${appelsListe.length})</button>
+        </div>
+        ${afficherDetailAppels ? `
+          <div class="table-wrap" style="margin-top:1rem;">
+            <table>
+              <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Date</th><th>Résultat</th></tr></thead>
+              <tbody>${appelsRows}</tbody>
+            </table>
+          </div>
+        ` : ""}
       ` : `<p class="muted">Aucun appel découverte enregistré pour le moment.</p>`}
     </div>
   `;
