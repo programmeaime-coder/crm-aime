@@ -1844,6 +1844,30 @@ function reponseParEtapeHtml(rows) {
   `;
 }
 
+// Liste des postes des appels decouverte, sous la meme forme visuelle que
+// profilCibleHtml (chips) pour permettre une comparaison a l'oeil directe
+// avec le profil cible des clientes actuelles -- pas de scoring automatique
+// (texte libre issu de l'extraction LinkedIn, une correspondance textuelle
+// fiable n'est pas garantie, cf. discussion avec Marie).
+function posteAppelsHtml(appelsListe) {
+  const postes = appelsListe.filter(a => a.poste && a.poste.trim());
+  if (!postes.length) {
+    return `
+      <div class="profil-cible">
+        <div class="profil-cible__eyebrow">Postes des appels découverte</div>
+        <p class="muted">Poste pas encore renseigné sur ces appels.</p>
+      </div>
+    `;
+  }
+  const chips = postes.map(a => `<span class="profil-cible__chip">${escapeHtml(a.poste.trim())}</span>`).join("");
+  return `
+    <div class="profil-cible">
+      <div class="profil-cible__eyebrow">Postes des appels découverte (n=${postes.length})</div>
+      <div class="profil-cible__list">${chips}</div>
+    </div>
+  `;
+}
+
 function renderStatsSection(data) {
   const prospects = data.prospects;
   const clients = data.clients;
@@ -1927,12 +1951,21 @@ function renderStatsSection(data) {
 
       <div class="viz-row">
         <div class="viz-block">
-          <div class="viz-block__title">Température (correspondance à la cible)</div>
+          <div class="viz-block__title">Température (intérêt commercial)</div>
           ${segmentsTemp.length ? pieChartHtml(segmentsTemp, 150) : `<p class="muted">Température pas encore renseignée sur ces appels.</p>`}
         </div>
         <div class="viz-block">
           <div class="viz-block__title">Origine de la demande</div>
           ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 150) : `<p class="muted">Origine pas encore renseignée — elle se demande automatiquement (popup facultatif) dès qu'un Statut passe à "Appel découverte".</p>`}
+        </div>
+      </div>
+
+      <div class="viz-row">
+        <div class="viz-block">
+          ${posteAppelsHtml(appelsListe)}
+        </div>
+        <div class="viz-block">
+          ${profilCibleHtml(clients)}
         </div>
       </div>
 
