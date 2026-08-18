@@ -99,7 +99,7 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 /* Variante compacte pour l'onglet Stats -- ne s'etire pas sur toute la
    largeur, tuiles plus petites. N'affecte pas .stats/.stat de base (utilise
    ailleurs, ex. Tableau de bord). */
-.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; margin-bottom: 1.75rem; }
+.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; max-width: 100%; margin-bottom: 1.75rem; }
 .stats--compact .stat { padding: 0.8rem 1.4rem; min-width: 120px; }
 .stats--compact .stat__value { font-size: 21px; }
 .stats--compact .stat__label { font-size: 9px; margin-top: 0.3rem; }
@@ -2207,7 +2207,7 @@ function renderStatsSection(data) {
       </div>
     </div>
 
-    <div class="section">
+    <div class="section" style="margin-bottom:2rem;">
       <div class="section__head"><span class="section__eyebrow">Efficacité de mes messages</span></div>
 
       <div class="viz-row">
@@ -2951,6 +2951,12 @@ function renderRafaleActionCard() {
       <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
       <div class="modal-actions" style="justify-content:flex-start;">
         <button class="btn" onclick="rafaleActionsEnvoyerSuivant()">Envoyé → suivant (Entrée)</button>
+      </div>
+      <p class="muted" style="margin-top:1rem;margin-bottom:0.35rem;">La personne a déjà répondu (fiche pas à jour) :</p>
+      <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+        <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('En conversation')">En conversation</button>
+        <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('Pas maintenant')">Pas maintenant</button>
+        <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('Hors cible')">Hors cible</button>
       </div>
       <p class="muted">Retour arrière = précédent, Échap = quitter.</p>
       <div class="modal-actions" style="margin-top:1.5rem;">
