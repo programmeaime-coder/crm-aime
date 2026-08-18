@@ -149,6 +149,8 @@ tr:last-child td { border-bottom: none; }
 .name-cell { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; }
 .name-cell--link { cursor: pointer; }
 .name-cell--link:hover { text-decoration: underline; }
+.rappel-nom-link { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(184,130,74,0.6); }
+.rappel-nom-link:hover { text-decoration-color: currentColor; }
 .muted { color: var(--text-muted); font-size: 12.5px; }
 .empty-msg { padding: 2rem 0.75rem; color: var(--text-muted); font-size: 13px; text-align: center; }
 
@@ -380,7 +382,11 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .lock-card { max-width: 340px; width: 100%; text-align: center; }
 .lock-card__eyebrow { font-family: 'Special Elite', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem; }
 .lock-card__title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 600; margin-bottom: 1.5rem; }
-.lock-card input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 12px; border: 0.5px solid var(--border); margin-bottom: 1rem; text-align: center; }
+.lock-card input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 12px; border: 0.5px solid var(--border); text-align: center; }
+.lock-card__pwd-wrap { position: relative; margin-bottom: 1rem; }
+.lock-card__pwd-wrap input { margin-bottom: 0; padding-right: 40px; }
+.lock-card__pwd-toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 15px; padding: 6px 8px; line-height: 1; opacity: 0.55; }
+.lock-card__pwd-toggle:hover { opacity: 1; }
 .lock-card .btn { width: 100%; }
 .lock-error { color: var(--bordeaux); font-size: 12.5px; margin-top: 0.85rem; display: none; }
 
@@ -411,7 +417,10 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
     <div class="lock-card">
       <div class="lock-card__eyebrow">Accès privé</div>
       <h2 class="lock-card__title">Entre ton mot de passe</h2>
-      <input type="password" id="lock-pwd" placeholder="Mot de passe">
+      <div class="lock-card__pwd-wrap">
+        <input type="password" id="lock-pwd" placeholder="Mot de passe">
+        <button type="button" class="lock-card__pwd-toggle" id="lock-pwd-toggle" onclick="toggleLockPwdVisibility()" aria-label="Afficher le mot de passe">👁</button>
+      </div>
       <button class="btn" id="lock-submit" onclick="submitPassword()">Entrer</button>
       <p class="lock-error" id="lock-error"></p>
     </div>
@@ -731,6 +740,15 @@ function showLockScreen(errorMsg) {
   document.getElementById("lock-pwd").focus();
 }
 
+function toggleLockPwdVisibility() {
+  const input = document.getElementById("lock-pwd");
+  const btn = document.getElementById("lock-pwd-toggle");
+  const enClair = input.type === "password";
+  input.type = enClair ? "text" : "password";
+  btn.textContent = enClair ? "🙈" : "👁";
+  btn.setAttribute("aria-label", enClair ? "Masquer le mot de passe" : "Afficher le mot de passe");
+  input.focus();
+}
 async function submitPassword() {
   const val = document.getElementById("lock-pwd").value;
   setStoredPassword(val);
@@ -931,6 +949,13 @@ function templateKeyPourEnvoi(p) {
   if (p.statut === "Nouveau" && p.date1erMessage) return "Première relance";
   return p.statut;
 }
+// Nom cliquable, ouvre la fiche historique (openHistoriqueModal) -- souligne
+// en permanence (pas seulement au survol comme .name-cell--link dans le
+// tableau Prospects) pour que l'affordance soit visible d'un coup d'oeil
+// dans le tableau de bord, sans avoir a deviner qu'on peut cliquer.
+function nomFicheHtml(p) {
+  return `<b class="rappel-nom-link" onclick="openHistoriqueModal(${p.ligne})">${escapeHtml(p.nom)}</b>`;
+}
 function rappelsADemainHtml(prospects, obj) {
   const aujourdhui = today0();
   const upcoming = prospects
@@ -956,24 +981,24 @@ function rappelsADemainHtml(prospects, obj) {
       <p class="muted" style="margin-bottom:0.4rem;"><b>Appel découverte</b></p>
       ${upcoming.length ? `<div class="rappels-list">${upcoming.map(p => `
         <div class="rappel-item">
-          <span><b>${escapeHtml(p.nom)}</b> — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
+          <span>${nomFicheHtml(p)} — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
           <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
         </div>
       `).join("")}</div>` : ""}
-      ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — appel tenu, à évaluer</span></div>`).join("")}</div>` : ""}
+      ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `<div class="rappel-item"><span>${nomFicheHtml(p)} — appel tenu, à évaluer</span></div>`).join("")}</div>` : ""}
     </div>` : "";
 
   const groupeReprise = repriseADecider.length ? `
     <div class="rappel-groupe" style="margin-top:0.75rem;">
       <p class="muted" style="margin-bottom:0.4rem;"><b>Reprise de contact J+7</b></p>
-      <div class="rappels-list">${repriseADecider.map(p => `<div class="rappel-item"><span><b>${escapeHtml(p.nom)}</b> — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
+      <div class="rappels-list">${repriseADecider.map(p => `<div class="rappel-item"><span>${nomFicheHtml(p)} — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
     </div>` : "";
 
   const groupeDeuxieme = deuxiemeADecider.length ? `
     <div class="rappel-groupe" style="margin-top:0.75rem;">
       <div class="rappel-item rappel-item--block">
         <div><b>${deuxiemeADecider.length} en deuxième relance (J+7)</b></div>
-        <div>${deuxiemeADecider.map(p => `${escapeHtml(p.nom)} (${joursEcoules(p.dateEntreeStatutRelance)}j)`).join(", ")}</div>
+        <div>${deuxiemeADecider.map(p => `${nomFicheHtml(p)} (${joursEcoules(p.dateEntreeStatutRelance)}j)`).join(", ")}</div>
       </div>
     </div>` : "";
 
@@ -1256,8 +1281,19 @@ function renderDashboard(data) {
   const totalClients = data.clients.length;
   const totalContacts = totalProspects + totalClients;
   const caGenere = data.clients.reduce((somme, c) => somme + (Number(c.montant) || 0), 0);
-  const tauxConversion = totalContacts > 0 ? Math.round((totalClients / totalContacts) * 100) : 0;
-  const s = { totalContacts, totalProspects, totalClients, caGenere, tauxConversion };
+  // Precision demandee par Marie le 2026-08-18 : ne plus arrondir a l'entier
+  // (8/2553 affichait "0%", illisible) -- 2 decimales, jamais arrondi a 0
+  // tant que le ratio est non-nul.
+  const tauxConversion = totalContacts > 0 ? ((totalClients / totalContacts) * 100).toFixed(2) : "0";
+  // "Prospects a contacter" = jamais encore contactes (Nouveau + A traiter,
+  // aucun 1er message envoye) -- avant, comptait TOUT l'onglet Prospects
+  // (Hors cible/Pas maintenant/Recontacter/etc inclus), ce que Marie a
+  // signale comme trompeur le 2026-08-18 (annoncait 2545 alors qu'une bonne
+  // partie est deja traitee). Decision actee : A traiter compte comme "pas
+  // contacte" au meme titre que Nouveau (aucun des deux n'a de 1er message
+  // envoye, seule la classification differe).
+  const totalProspectsAContacter = data.prospects.filter(p => p.statut === "Nouveau" || p.statut === "À traiter").length;
+  const s = { totalContacts, totalProspects, totalProspectsAContacter, totalClients, caGenere, tauxConversion };
   const obj = data.objectifs || {};
   const maintenant = new Date();
   const plan = planAppelsMois(maintenant, data, obj);
@@ -1283,7 +1319,7 @@ function renderDashboard(data) {
   return `
     <div class="stats">
       <div class="stat"><div class="stat__value">${s.totalContacts}</div><div class="stat__label">Contacts totaux</div></div>
-      <div class="stat"><div class="stat__value">${s.totalProspects}</div><div class="stat__label">Prospects à contacter</div></div>
+      <div class="stat"><div class="stat__value">${s.totalProspectsAContacter}</div><div class="stat__label">Prospects à contacter</div></div>
       <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${s.totalClients}</div><div class="stat__label">Clientes</div></div>
       <div class="stat stat--accent"><div class="stat__value stat__value--success">${s.tauxConversion}%</div><div class="stat__label">Taux de conversion</div></div>
       <div class="stat stat--accent"><div class="stat__value stat__value--success">${s.caGenere.toLocaleString("fr-FR")}€</div><div class="stat__label">CA généré</div></div>
@@ -1835,10 +1871,19 @@ function funnelHtml(etapes) {
         // Appel decouverte trace) -- afficher "100%+" plutot qu'un chiffre
         // absurde, mais garder une barre pleine dans ce cas precis.
         const pctAffiche = pct !== null && pct > 100 ? "100%+" : (pct !== null ? pct + "%" : null);
-        const largeur = pct !== null ? Math.max(2, Math.min(pct, 100)) : 2;
+        // Le plancher de 2% garde une barre visible meme pour un tres petit
+        // pourcentage non nul -- mais quand le % AFFICHE arrondit a 0 (base tres
+        // grande, ex. Appel decouverte/Client rapportes aux prospects totaux),
+        // il affichait quand meme un petit rectangle alors que le texte dit "0%"
+        // -- contradiction signalee par Marie le 18/08. Le plancher doit suivre
+        // le % affiche (pct), pas la valeur brute (e.valeur peut etre > 0 tout en
+        // arrondissant a 0%).
+        const largeur = pct !== null ? (pct > 0 ? Math.max(2, Math.min(pct, 100)) : 0) : 2;
         const couleur = pct !== null ? couleurFunnelParSeuil(Math.min(pct, 100)) : "var(--viz-funnel-1)";
-        const pctMois = (e.base && e.valeurMois !== undefined) ? Math.max(2, Math.min(100, Math.round((e.valeurMois / e.base) * 100))) : null;
-        const pctSemaine = (e.base && e.valeurSemaine !== undefined) ? Math.max(2, Math.min(100, Math.round((e.valeurSemaine / e.base) * 100))) : null;
+        const pctMoisBrut = (e.base && e.valeurMois !== undefined) ? Math.round((e.valeurMois / e.base) * 100) : null;
+        const pctSemaineBrut = (e.base && e.valeurSemaine !== undefined) ? Math.round((e.valeurSemaine / e.base) * 100) : null;
+        const pctMois = pctMoisBrut !== null ? (pctMoisBrut > 0 ? Math.max(2, Math.min(100, pctMoisBrut)) : 0) : null;
+        const pctSemaine = pctSemaineBrut !== null ? (pctSemaineBrut > 0 ? Math.max(2, Math.min(100, pctSemaineBrut)) : 0) : null;
         return `
           <div class="funnel-row">
             <div class="funnel-row__top">
@@ -2207,11 +2252,11 @@ function renderStatsSection(data) {
       </div>
     </div>
 
-    <div class="section" style="margin-bottom:2rem;">
+    <div class="section" style="margin-bottom:1.75rem;">
       <div class="section__head"><span class="section__eyebrow">Efficacité de mes messages</span></div>
 
       <div class="viz-row">
-        <div class="viz-block" style="flex:1 1 460px;">
+        <div class="viz-block" style="flex:1 1 460px;margin-bottom:0;">
           <div class="viz-block__title">Où est-ce que ça bloque ?</div>
           <p class="muted" style="margin-bottom:0.6rem;">% = conversion depuis l'étape précédente.</p>
           <div class="funnel-legend">
@@ -2404,16 +2449,20 @@ function openHistoriqueModal(ligne) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
   if (!p) return;
   const evenements = [];
-  if (p.dateAppelDecouverte) evenements.push({ label: "Appel découverte", date: p.dateAppelDecouverte });
-  if (p.date1erMessage) evenements.push({ label: "Premier message", date: p.date1erMessage });
+  if (p.dateAppelDecouverte) evenements.push({ label: "Appel découverte", date: p.dateAppelDecouverte, champs: ["dateAppelDecouverte"] });
+  if (p.date1erMessage) evenements.push({ label: "Premier message", date: p.date1erMessage, champs: ["date1erMessage"] });
   // Prefere la date REELLE d'envoi (ecrite par Code.gs des que Nb relances
   // atteint 1/2) a Relance 1/2 (J), qui reste une date theorique calculee a
   // partir de la Date 1er message et se decale du reel des que Marie a du
   // retard sur son stock -- repli sur la date theorique uniquement pour les
   // prospects traites avant l'ajout de ce champ (dateEnvoiPremiereRelance).
+  // Effacer ces deux evenements agit sur Nb relances (le vrai champ qui pilote
+  // le pipeline, voir DECISION_CONFIG/rafaleActionsCandidats) -- une simple
+  // suppression de la date ne suffirait pas, la mention reapparaitrait via le
+  // repli sur relance1/relance2 tant que Nb relances n'est pas redescendu.
   const n = Number(p.nbRelances) || 0;
-  if (n >= 1 && (p.dateEnvoiPremiereRelance || p.relance1)) evenements.push({ label: "Première relance", date: p.dateEnvoiPremiereRelance || p.relance1 });
-  if (n >= 2 && (p.dateEntreeStatutRelance || p.relance2)) evenements.push({ label: "Deuxième relance", date: p.dateEntreeStatutRelance || p.relance2 });
+  if (n >= 1 && (p.dateEnvoiPremiereRelance || p.relance1)) evenements.push({ label: "Première relance", date: p.dateEnvoiPremiereRelance || p.relance1, champs: ["nbRelances:0", "dateEnvoiPremiereRelance", "dateEntreeStatutRelance"] });
+  if (n >= 2 && (p.dateEntreeStatutRelance || p.relance2)) evenements.push({ label: "Deuxième relance", date: p.dateEntreeStatutRelance || p.relance2, champs: ["nbRelances:1", "dateEntreeStatutRelance"] });
   // Si c'est juste un premier message jamais relance et jamais repondu, la
   // ligne "Premier message" ci-dessus dit deja tout -- la date de rappel est
   // une echeance interne artificielle (voir dateRappelEchelonnee cote
@@ -2422,18 +2471,35 @@ function openHistoriqueModal(ligne) {
   // riche qu'un simple "jamais repondu").
   if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel
     && !((Number(p.nbRelances) || 0) === 0 && p.date1erMessage)) {
-    evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel });
+    evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel, champs: ["dateRappel"] });
   }
+  if (p.dateReponse) evenements.push({ label: "Date de première réponse", date: p.dateReponse, champs: ["dateReponse"] });
+  if (p.dateAttenteConnexion) evenements.push({ label: "En attente de connexion depuis", date: p.dateAttenteConnexion, champs: ["dateAttenteConnexion"] });
   evenements.sort((a, b) => (parseFrDate(a.date) || 0) - (parseFrDate(b.date) || 0));
 
   const listeHtml = evenements.length
-    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.label)}</b> — ${escapeHtml(ev.date)}</li>`).join("")}</ul>`
+    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.label)}</b> — ${escapeHtml(ev.date)} <button class="link-btn" onclick="effacerEvenementFiche(${ligne}, ${JSON.stringify(ev.champs).replace(/"/g, "&quot;")}, '${ev.label.replace(/'/g, "\\'")}')">Effacer</button></li>`).join("")}</ul>`
     : `<p class="muted">Aucun événement daté pour le moment.</p>`;
 
   document.getElementById("modal-content").innerHTML = `
     <h2>${escapeHtml(p.nom)}</h2>
     <p class="muted" style="margin-bottom:1rem;">${escapeHtml(p.poste || "")} — statut actuel : ${escapeHtml(p.statut || "—")}</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <div style="flex:1;min-width:140px;">
+        <label>Téléphone</label>
+        <input class="note-input" style="width:100%;" type="tel" value="${escapeHtml(p.telephone || "")}" placeholder="—" onchange="updateField(${ligne}, 'telephone', this.value)">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label>Email</label>
+        <input class="note-input" style="width:100%;" type="email" value="${escapeHtml(p.email || "")}" placeholder="—" onchange="updateField(${ligne}, 'email', this.value)">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label>Appel découverte</label>
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" onchange="updateField(${ligne}, 'dateAppelDecouverte', this.value)">
+      </div>
+    </div>
     ${listeHtml}
+    <p class="muted" style="margin-top:0.5rem;">Effacer un événement corrige aussi Nb relances si besoin, pour que la fiche reste cohérente avec le statut (change le statut via le tableau si besoin).</p>
     <label style="margin-top:1rem;">Note</label>
     <textarea id="m-historique-note" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Les points importants...">${escapeHtml(p.note || "")}</textarea>
     <div class="modal-actions">
@@ -2447,6 +2513,19 @@ async function submitHistoriqueNote(ligne) {
   const valeur = document.getElementById("m-historique-note").value;
   await updateField(ligne, "note", valeur);
   closeModal();
+}
+// Efface un evenement de la fiche historique (mauvais bouton clique par
+// erreur) -- chaque champ peut etre "champ" (vide le champ) ou "champ:valeur"
+// (ecrit une valeur precise, utilise pour redescendre Nb relances). Sequentiel
+// (pas Promise.all) car updateField() mute currentData de facon optimiste :
+// en parallele, deux appels pourraient se marcher dessus sur la meme ligne.
+async function effacerEvenementFiche(ligne, champs, label) {
+  if (!confirm("Effacer \"" + label + "\" de la fiche ?")) return;
+  for (const spec of champs) {
+    const [champ, valeur] = spec.split(":");
+    if (!(await updateField(ligne, champ, valeur !== undefined ? valeur : ""))) return;
+  }
+  openHistoriqueModal(ligne);
 }
 
 // Origine de l'appel decouverte : 4 boutons, zero saisie obligatoire (bouton
@@ -2885,10 +2964,20 @@ function rafaleActionsCandidats() {
   // le stock temporaire des ~2300 abonnes a rattraper, traite a part par
   // "Rafale : premiers messages" (onglet Prospects). Rafale : actions ne
   // couvre que ce qui reviendra en continu une fois ce stock ecoule.
+  //
+  // Bug corrige le 18/08/2026 : "Première relance"/"Deuxième relance" etaient
+  // inclus des l'entree dans ce statut (des l'enregistrement de Date 1er
+  // message, voir updateField), sans jamais verifier que le delai J+5/J+7 est
+  // ecoule -- un prospect contacte la veille se retrouvait donc propose pour
+  // sa relance des le lendemain. relancesADemainHtml() faisait deja ce
+  // controle correctement (isOverdue(nextRelance(p))) ; rafaleActionsCandidats
+  // ne le faisait pas. Repris ici pour rester coherent.
   return currentData.prospects.filter(p => {
     if (estADecider(p)) return true;
-    if (p.statut === "Première relance") return true;
-    if (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2) return true;
+    if (p.statut === "Première relance" || (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2)) {
+      const r = nextRelance(p);
+      return !!(r && isOverdue(r));
+    }
     if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));

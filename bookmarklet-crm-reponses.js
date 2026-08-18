@@ -13,7 +13,13 @@
 // des mois d'activite hors CRM). Une fois tous les paquets traites, un
 // dernier appel (action=verifierAbsents) signale les prospects deja en cours
 // de relance (Premiere/Deuxieme/Reprise de contact) dont aucun fil n'a ete
-// repere du tout. Le panneau flottant affiche tout ca.
+// repere du tout. Une derniere fenetre (action=voirResultatsSession)
+// s'ouvre automatiquement et affiche le recapitulatif complet -- PAS de
+// panneau flottant sur LinkedIn (abandonne le 2026-08-17 : LinkedIn bloque
+// tous les canaux de retour testes -- postMessage via window.opener coupe
+// par sa Cross-Origin-Opener-Policy, JSONP bloque par sa Content-Security-
+// Policy script-src -- donc le seul moyen fiable de voir le resultat est
+// une page que Code.gs affiche lui-meme, voir Code.gs/afficherResultatsSession).
 //
 // Cas ECRITS AUTOMATIQUEMENT (signal fiable, valide par Marie), par ordre de
 // priorite -- l'anciennete du dernier message (quel que soit l'emetteur)
@@ -48,6 +54,17 @@
 // la date qui permet de classifier sans ambiguite qui a la balle.
 
 (function () {
+  // Un "/u/0/" avait ete ajoute ici le 2026-08-16 pour forcer un compte
+  // Google specifique, suite a un blocage Drive ("Impossible d'ouvrir le
+  // fichier"). Retire le 2026-08-17 : verifie en conditions reelles que
+  // l'URL sans index fonctionne directement (aucune redirection vers un
+  // "/u/N/", reponse Code.gs recue normalement) -- forcer "/u/0/" causait en
+  // fait le meme blocage "Impossible d'ouvrir le fichier" dans le contexte
+  // d'une fenetre ouverte depuis linkedin.com (index 0 n'y designe pas le
+  // bon compte). Si ce blocage revient, verifier plutot en ouvrant cette URL
+  // telle quelle dans un nouvel onglet du meme profil Chrome : si elle
+  // redirige vers un "/u/N/" precis, c'est CET index qu'il faut coder ici --
+  // pas une valeur arbitraire.
   var URL_BASE = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
 
   // Memorise les fils deja envoyes a matcherReponses (localStorage, cote
@@ -230,22 +247,25 @@
 
   // ─── Panneau flottant de resultats ───
 
-  function afficherPanneau(suggestions, nAnalysees) {
+  // Petit avis local (pas de suggestions a lister ici -- voir plus bas
+  // pourquoi le vrai resultat s'affiche desormais dans une fenetre a part,
+  // pas dans un panneau sur cet onglet).
+  function afficherAvis(titre, texte) {
     var ancien = document.getElementById("crmaime-panneau-reponses");
     if (ancien) ancien.remove();
 
     var panneau = document.createElement("div");
     panneau.id = "crmaime-panneau-reponses";
-    panneau.style.cssText = "position:fixed;top:20px;right:20px;width:420px;max-height:80vh;overflow-y:auto;"
+    panneau.style.cssText = "position:fixed;top:20px;right:20px;width:360px;"
       + "background:#fff;border:1px solid #ccc;box-shadow:0 4px 24px rgba(0,0,0,0.25);z-index:999999;"
       + "font-family:Arial,sans-serif;font-size:13px;padding:16px;border-radius:6px;";
 
     var entete = document.createElement("div");
-    entete.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;";
-    var titre = document.createElement("b");
-    titre.style.fontSize = "15px";
-    titre.textContent = "CRM — Reconciliation (" + suggestions.length + "/" + nAnalysees + ")";
-    entete.appendChild(titre);
+    entete.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;";
+    var titreEl = document.createElement("b");
+    titreEl.style.fontSize = "15px";
+    titreEl.textContent = titre;
+    entete.appendChild(titreEl);
     var fermer = document.createElement("button");
     fermer.textContent = "✕";
     fermer.style.cssText = "border:none;background:none;font-size:16px;cursor:pointer;";
@@ -253,64 +273,37 @@
     entete.appendChild(fermer);
     panneau.appendChild(entete);
 
-    if (ignoresDejaTraites > 0) {
-      var noteCache = document.createElement("p");
-      noteCache.style.cssText = "color:#767676;font-size:12px;margin-bottom:12px;";
-      noteCache.textContent = ignoresDejaTraites + " conversation(s) ignorée(s) — déjà traitées lors d'un run précédent.";
-      panneau.appendChild(noteCache);
-    }
-
-    if (suggestions.length === 0) {
-      var vide = document.createElement("p");
-      vide.style.color = "#767676";
-      vide.textContent = nAnalysees === 0
-        ? "Aucune conversation détectée — les sélecteurs du bookmarklet ne correspondent probablement pas à la structure actuelle de la page, à corriger."
-        : "Rien à signaler : les " + nAnalysees + " conversations analysées correspondent déjà à ce qui est enregistré dans le CRM.";
-      panneau.appendChild(vide);
-    }
-
-    // Construction via createElement/textContent plutot que innerHTML : s.nom
-    // vient du texte scrape sur LinkedIn (page tierce, pas du contenu de
-    // confiance) -- jamais interpole tel quel dans du HTML.
-    var COULEURS = {
-      "En conversation": "#15803d",
-      "Première relance": "#15803d",
-      "Deuxième relance": "#15803d",
-      "Pas maintenant": "#767676",
-      "Recontacter": "#5b6b85",
-      "Écart détecté": "#b8824a",
-      "À vérifier manuellement": "#b8824a",
-      "Aucune conversation trouvée": "#8B1A1A"
-    };
-    suggestions.forEach(function (s) {
-      var ligne = document.createElement("div");
-      ligne.style.cssText = "border-top:1px solid #eee;padding:10px 0;";
-
-      var ligneNom = document.createElement("div");
-      var nomEl = document.createElement("b");
-      nomEl.textContent = s.nom;
-      ligneNom.appendChild(nomEl);
-      ligneNom.appendChild(document.createTextNode(" — "));
-      var statutEl = document.createElement("span");
-      statutEl.style.color = "#767676";
-      statutEl.textContent = s.statutActuel;
-      ligneNom.appendChild(statutEl);
-      ligne.appendChild(ligneNom);
-
-      var ligneSuggestion = document.createElement("div");
-      ligneSuggestion.style.cssText = "margin:4px 0;color:" + (COULEURS[s.suggestion] || "#767676") + ";";
-      ligneSuggestion.textContent = (s.appliqueAuto ? "✓ " : "→ ") + s.suggestion;
-      ligne.appendChild(ligneSuggestion);
-
-      var ligneRaison = document.createElement("div");
-      ligneRaison.style.cssText = "color:#767676;font-size:12px;";
-      ligneRaison.textContent = s.raison;
-      ligne.appendChild(ligneRaison);
-
-      panneau.appendChild(ligne);
-    });
+    var corps = document.createElement("p");
+    corps.style.cssText = "color:#767676;margin:0;";
+    corps.textContent = texte;
+    panneau.appendChild(corps);
 
     document.body.appendChild(panneau);
+  }
+
+  // ─── Envoi des paquets ───
+  // Historique des tentatives precedentes pour faire revenir un resultat
+  // depuis Code.gs vers l'onglet LinkedIn (toutes bloquees en conditions
+  // reelles le 2026-08-17) :
+  //  1. window.open + window.opener.postMessage : LinkedIn coupe la
+  //     relation window.opener entre la popup et l'onglet appelant
+  //     (Cross-Origin-Opener-Policy) -- la requete part et Code.gs ecrit
+  //     bien dans le Sheet, mais le message retour n'arrive jamais.
+  //  2. JSONP (balise <script src="...&callback=...">) : LinkedIn bloque le
+  //     chargement du script via sa Content-Security-Policy (script-src),
+  //     la requete ne part meme pas.
+  //  3. fetch/XHR : deja ecarte de longue date (connect-src, voir
+  //     commentaire historique plus bas sur captureLot dans Code.gs).
+  // Seule la navigation simple (window.open(url), sans jamais lire ni
+  // ecouter de reponse) n'est bloquee par rien de tout ca -- c'est ce qui
+  // reste utilisable pour ENVOYER, mais pas pour RECUPERER un resultat
+  // depuis cet onglet. Solution (voir Code.gs, ONGLET_SESSIONS_LOG) : chaque
+  // paquet ecrit son resultat dans un journal cote Sheet, identifie par
+  // "session" (genere ci-dessous). Une derniere navigation ouvre la page de
+  // resultats que Code.gs construit lui-meme (afficherResultatsSession) --
+  // Marie regarde CETTE fenetre plutot qu'un panneau sur LinkedIn.
+  function genererSession() {
+    return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 
   function envoyer() {
@@ -323,70 +316,67 @@
     sauvegarderTraites(dejaTraites);
 
     if (conversations.length === 0) {
-      afficherPanneau([], 0);
+      afficherAvis("CRM — Réconciliation", ignoresDejaTraites > 0
+        ? ignoresDejaTraites + " conversation(s) ignorée(s) — déjà traitées lors d'un run précédent."
+        : "Aucune conversation détectée — les sélecteurs du bookmarklet ne correspondent probablement pas à la structure actuelle de la page, à corriger.");
       return;
     }
-    // Taille de paquet limitee a 10 (pas 40) : chaque conversation embarque
-    // jusqu'a 140 caracteres d'extrait, et l'appel part en GET (donnees dans
-    // l'URL, pas en POST) -- avec des accents francais qui gonflent sous
+    // Taille de paquet limitee a 10 : chaque conversation embarque jusqu'a
+    // 140 caracteres d'extrait, et l'appel part en GET (donnees dans l'URL,
+    // pas en POST) -- avec des accents francais qui gonflent sous
     // encodeURIComponent, un paquet de 40 produit une URL de ~18000
     // caracteres, au-dela de ce que les serveurs Google acceptent en entete
-    // de requete (verifie en conditions reelles : erreur "400 -- Votre
-    // client a emis une demande mal formee", qui vient du frontend Google,
-    // pas du script -- Code.gs ne recoit meme pas la requete). Avec 10, on
-    // reste a ~4600 caracteres.
+    // de requete (erreur "400 -- Votre client a emis une demande mal
+    // formee"). Avec 10, on reste a ~4600 caracteres.
     var TAILLE_PAQUET = 10;
     var paquets = [];
     for (var i = 0; i < conversations.length; i += TAILLE_PAQUET) paquets.push(conversations.slice(i, i + TAILLE_PAQUET));
-    var suggestions = [];
-    var lignesTrouvees = [];
-    var recus = 0, termine = false;
+    var session = genererSession();
 
-    function verifierAbsentsPuisAfficher() {
-      var url = URL_BASE + "?action=verifierAbsents&pwd=" + encodeURIComponent(pwd)
-        + "&lignes=" + encodeURIComponent(JSON.stringify(lignesTrouvees));
-      var attendu = true;
-      function surMessageAbsents(ev) {
-        if (!ev.data || ev.data.type !== "crmaime_absents_resultat") return;
-        attendu = false;
-        window.removeEventListener("message", surMessageAbsents);
-        suggestions = suggestions.concat(ev.data.suggestions || []);
-        afficherPanneau(suggestions, conversations.length);
-      }
-      window.addEventListener("message", surMessageAbsents);
-      window.open(url, "crmaime_absents");
-      setTimeout(function () {
-        if (attendu) {
-          window.removeEventListener("message", surMessageAbsents);
-          afficherPanneau(suggestions, conversations.length);
-        }
-      }, 4000);
-    }
-
-    function finir() {
-      if (termine) return;
-      termine = true;
-      window.removeEventListener("message", surMessage);
-      verifierAbsentsPuisAfficher();
-    }
-    function surMessage(ev) {
-      if (!ev.data || ev.data.type !== "crmaime_reponses_resultat") return;
-      suggestions = suggestions.concat(ev.data.suggestions || []);
-      lignesTrouvees = lignesTrouvees.concat(ev.data.lignesTrouvees || []);
-      recus++;
-      if (recus >= paquets.length) finir();
-    }
-    window.addEventListener("message", surMessage);
+    // Espacement entre paquets, releve de 2,5s a 15s le 2026-08-18 : a 2,5s,
+    // sur un gros scan (140+ paquets), les requetes arrivaient plus vite que
+    // matcherReponses ne pouvait les traiter (chacune lit tout Prospects,
+    // ~2500 lignes, SOUS verrou cote Code.gs) -- la file d'attente grossissait
+    // jusqu'a ce que des paquets attendent plus de 30s le verrou et echouent
+    // completement ("Exception: Expiration de la demande de verrouillage"),
+    // perdant les 10 conversations du paquet sans aucun signal clair pour
+    // Marie. A 15s, l'espacement client depasse largement la duree d'une
+    // execution serveur -- combine au timeout de verrou releve a 120s cote
+    // Code.gs (voir matcherReponses), la file ne devrait plus jamais se
+    // former. Marie prefere explicitement un scan lent (quitte a durer
+    // jusqu'a ~1h sur un gros historique) plutot que rapide et partiel.
+    var DELAI_ENTRE_PAQUETS = 15000;
     paquets.forEach(function (paquet, idx) {
       setTimeout(function () {
-        var url = URL_BASE + "?action=matcherReponses&pwd=" + encodeURIComponent(pwd)
-          + "&donnees=" + encodeURIComponent(JSON.stringify(paquet));
-        window.open(url, "crmaime_reponses_" + idx);
-      }, idx * 2200);
+        var url = URL_BASE + "?action=matcherReponses&session=" + encodeURIComponent(session)
+          + "&pwd=" + encodeURIComponent(pwd) + "&donnees=" + encodeURIComponent(JSON.stringify(paquet));
+        window.open(url, "crmaime_paquet_" + idx);
+      }, idx * DELAI_ENTRE_PAQUETS);
     });
+
+    var delaiAbsents = paquets.length * DELAI_ENTRE_PAQUETS + 3000;
     setTimeout(function () {
-      if (!termine) finir();
-    }, paquets.length * 2200 + 6000);
+      var urlAbsents = URL_BASE + "?action=verifierAbsents&session=" + encodeURIComponent(session)
+        + "&pwd=" + encodeURIComponent(pwd);
+      window.open(urlAbsents, "crmaime_absents");
+    }, delaiAbsents);
+
+    // Fenetre de resultats finale : delai genereux (40s apres le dernier
+    // appel prevu) car on n'a plus aucun signal de fin d'execution cote
+    // client (voir historique plus haut) -- matcherReponses peut prendre
+    // 18-37s cote serveur. La page elle-meme invite a l'actualiser si le
+    // compte semble bas (voir Code.gs, afficherResultatsSession).
+    var delaiResultats = delaiAbsents + 40000;
+    setTimeout(function () {
+      var urlResultats = URL_BASE + "?action=voirResultatsSession&session=" + encodeURIComponent(session)
+        + "&pwd=" + encodeURIComponent(pwd);
+      window.open(urlResultats, "crmaime_resultats");
+    }, delaiResultats);
+
+    afficherAvis("CRM — Réconciliation en cours",
+      conversations.length + " conversation(s) envoyée(s) au CRM"
+      + (ignoresDejaTraites > 0 ? " (" + ignoresDejaTraites + " ignorée(s), déjà traitées)" : "") + "."
+      + " La fenêtre de résultats s'ouvrira automatiquement dans ~" + Math.round(delaiResultats / 1000) + "s — ne ferme pas cet onglet d'ici là.");
   }
 
   var palier = 0;
