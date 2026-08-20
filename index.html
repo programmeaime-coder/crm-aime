@@ -49,14 +49,14 @@
   --viz-origine-propose: #a89684;
   --viz-origine-initiative: #e07a28;
   --viz-origine-bouche-oreille: #c9946a;
-  /* "Ou est-ce que ca bloque" reutilise l'ANCIENNE palette Origine (rouge/
-     jaune citron/vert pomme en transparence, choisie avant la version
-     taupe/orange ci-dessus) -- Marie a precise que c'etait celle-la qu'elle
-     visait pour le funnel, pas la nouvelle. Cyclee sur les 5 etapes faute
-     de mapping plus specifique. */
-  --viz-funnel-1: #f0c7c0;
-  --viz-funnel-2: #f7f0cf;
-  --viz-funnel-3: #d7e8ca;
+  /* "Ou est-ce que ca bloque" (rose/jaune citron/vert pomme) -- identite
+     confirmee par Marie le 19/08 (elle prefere cette palette dediee a la
+     bordeaux/ambre/succes reutilisee ailleurs dans l'appli) ; seul reproche :
+     les teintes du 16/08 etaient trop pales/transparentes pour ressortir.
+     Memes teintes, nettement plus saturees. */
+  --viz-funnel-1: #e0576a;
+  --viz-funnel-2: #e8c229;
+  --viz-funnel-3: #6fb35c;
   /* Categorie socio-pro : degrade du rouge bordeaux de la marque pour
      Chaud/Tiede (memes tons que les badges Temperature existants), bleu
      clair pour Froid. */
@@ -99,9 +99,17 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 /* Variante compacte pour l'onglet Stats -- ne s'etire pas sur toute la
    largeur, tuiles plus petites. N'affecte pas .stats/.stat de base (utilise
    ailleurs, ex. Tableau de bord). */
-.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; max-width: 100%; margin-bottom: 1.75rem; }
+.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; max-width: 100%; margin-bottom: 1.75rem; align-self: flex-start; }
 .stats--compact .stat { padding: 0.8rem 1.4rem; min-width: 120px; }
 .stats--compact .stat__value { font-size: 21px; }
+/* Rangee forcee sur une seule ligne (contrairement a .stats--compact qui
+   wrap des que le contenu depasse) -- utilisee pour le Test A/B, deux
+   colonnes qui doivent toujours rester cote a cote meme si le texte a
+   l'interieur d'une colonne est long. */
+.tplab-row { display: flex; gap: 0.9rem; margin-bottom: 0.4rem; }
+.tplab-col { flex: 1 1 0; min-width: 0; background: #fff; border: 0.5px solid var(--border); padding: 0.7rem 0.9rem; text-align: center; }
+.tplab-col .stat__value { font-size: 21px; }
+.tplab-col .stat__label { font-size: 9px; margin-top: 0.3rem; }
 .stats--compact .stat__label { font-size: 9px; margin-top: 0.3rem; }
 
 .section { margin-bottom: 3.5rem; }
@@ -167,6 +175,26 @@ tr:last-child td { border-bottom: none; }
 .table-prospects .link-btn { padding: 3px 0; font-size: 11.5px; }
 .table-prospects .row-actions { gap: 6px; }
 .table-prospects .name-cell { font-size: 15.5px; }
+
+/* Table Clients : lignes moins hautes + colonnes secondaires (Montant, Canal,
+   Séances, dates) resserrées pour laisser plus de place au bloc Nom/poste/age.
+   Pas de table-layout:fixed ici (contrairement a table-prospects) : Prochaine
+   action/Commentaire doivent rester libres de recuperer l'espace laisse par
+   les colonnes etroites. */
+.table-clients { table-layout: fixed; }
+.table-clients th, .table-clients td { padding: 0.5rem 0.6rem; font-size: 12.5px; }
+.table-clients th { white-space: normal; line-height: 1.3; }
+.table-clients td { overflow: hidden; }
+.table-clients .name-cell { font-size: 15px; white-space: normal; }
+.table-clients .champ-etroit { max-width: 56px; }
+.table-clients select.champ-etroit { max-width: 66px; }
+.table-clients .champ-date { max-width: 118px; }
+.table-clients .paiement-row { margin-bottom: 2px; }
+.table-clients .paiement-reste { margin-bottom: 2px; }
+.table-clients td[data-label="Prochaine action"] .note-input,
+.table-clients td[data-label="Commentaire"] .note-input { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.table-clients td[data-label="Prochaine action"] .note-input:focus,
+.table-clients td[data-label="Commentaire"] .note-input:focus { overflow: visible; text-overflow: clip; }
 
 select.statut-select {
   font-family: 'DM Sans', sans-serif;
@@ -339,7 +367,7 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .funnel-row__label { font-weight: 500; }
 .funnel-row__track { background: var(--viz-track-bg); height: 20px; position: relative; }
 .funnel-row__bar { position: absolute; left: 0; transition: width 0.3s; }
-.funnel-row__bar--global { top: 0; height: 100%; opacity: 0.16; }
+.funnel-row__bar--global { top: 0; height: 100%; opacity: 0.3; }
 .funnel-row__bar--mois { top: 15%; height: 62%; opacity: 0.58; box-shadow: 1px 0 0 #fff; }
 .funnel-row__bar--semaine { top: 27%; height: 38%; opacity: 1; box-shadow: 1px 0 0 #fff; }
 .funnel-legend { display: flex; gap: 1.25rem; margin-bottom: 0.9rem; font-size: 11.5px; color: var(--text-muted); }
@@ -357,12 +385,12 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .viz-row > .viz-block { flex: 1 1 320px; display: flex; flex-direction: column; }
 
 .taux-bars { display: flex; gap: 1.4rem; align-items: flex-end; margin-bottom: 1.1rem; flex: 1; }
-.taux-bar-col { flex: 1 1 0; max-width: 78px; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.taux-bar-col { flex: 1 1 0; max-width: 120px; display: flex; flex-direction: column; align-items: center; height: 100%; }
 .taux-bar-col__value { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .taux-bar-col__track { width: 100%; flex: 1; min-height: 40px; max-height: 75px; background: var(--viz-track-bg); display: flex; align-items: flex-end; }
 .taux-bar-col__fill { width: 100%; transition: height 0.3s; }
 .taux-bar-col__fill--muted { background: repeating-linear-gradient(135deg, var(--viz-track-bg), var(--viz-track-bg) 4px, #d4d2cc 4px, #d4d2cc 8px); }
-.taux-bar-col__label { font-size: 12px; margin-top: 8px; text-align: center; }
+.taux-bar-col__label { font-size: 12px; margin-top: 8px; text-align: center; white-space: nowrap; }
 .taux-row__suggestion { padding: 0.5rem 0.7rem; border: 0.5px solid var(--bordeaux-mid); background: var(--bordeaux-pale); font-size: 11.5px; line-height: 1.35; }
 .taux-row__suggestion-groupe { margin-top: 0.4rem; }
 .taux-row__suggestion-etape { font-weight: 600; margin-bottom: 0.1rem; }
@@ -475,6 +503,16 @@ Est-ce pour mon contenu ou par rapport à quelque chose que tu vis en ce moment 
 Je te remercie et je te souhaite une belle journée.
 
 Au plaisir de te lire,
+Marie 🌞`,
+  "Nouveau B": `Coucou {prenom} et bienvenue dans mon réseau 😊
+
+Je suis curieuse : qu'est-ce qui t'a donné envie de me suivre ?
+💌 Mon contenu,
+❣️ Quelque chose que tu vis en ce moment.
+
+Tu peux me répondre par un simple emoji, mais si tu souhaites m'en dire un peu plus sur toi, je te lirais avec plaisir.
+
+Belle journée,
 Marie 🌞`,
   "Première relance": `Bonjour {prenom},
 
@@ -927,14 +965,25 @@ function rappelVersementLiberatoireHtml() {
 }
 
 const DEFAULT_TEMPLATE_RAPPEL = "Bonjour {prenom}, petit rappel : notre appel découverte approche ! Au plaisir de te rencontrer très bientôt 😊";
-// Les 4 templates (3 messages de prospection + rappel appel decouverte) sont
-// stockes dans l'onglet "Objectifs" du Sheet, modifiables via le bouton
-// "Template" (onglet Prospects). Tant qu'un champ est vide dans le Sheet, on
-// retombe sur sa valeur par defaut ci-dessus -- jamais de message vide envoye.
+// Le message "Nouveau" (1er contact) existe en deux versions testees en A/B
+// (A = ancien, B = version raccourcie du 18/08 -- cf. MOTIFS_NOUVEAU_TEMPLATE_1ER_MESSAGE
+// dans Code.gs pour la detection retrospective de la variante envoyee). Un
+// selecteur dans la modale Template choisit laquelle des deux est utilisee
+// partout (Rafale, copie manuelle) -- stocke dans templateNouveauActif ("A"/"B").
+// Les 5 templates de messages (2 variantes Nouveau + 3 relances/reprise) plus le
+// rappel appel decouverte sont stockes dans l'onglet "Objectifs" du Sheet,
+// modifiables via le bouton "Template" (onglet Prospects). Tant qu'un champ est
+// vide dans le Sheet, on retombe sur sa valeur par defaut ci-dessus -- jamais de
+// message vide envoye.
+const DEFAULT_TEMPLATE_NOUVEAU_ACTIF = "B";
 function messageTemplatesActuels() {
   const obj = (currentData && currentData.objectifs) || {};
+  const actif = obj.templateNouveauActif || DEFAULT_TEMPLATE_NOUVEAU_ACTIF;
+  const nouveauTexte = actif === "B"
+    ? (obj.templateNouveauB || DEFAULT_MESSAGE_TEMPLATES["Nouveau B"])
+    : (obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"]);
   return {
-    "Nouveau": obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"],
+    "Nouveau": nouveauTexte,
     "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
     "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"],
     "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"]
@@ -1054,10 +1103,18 @@ function copierRappel(nom) {
   }
 }
 
+// "Realise" = appels deja passes uniquement -- une date future (ex. appel
+// booke pour la semaine prochaine, encore dans le mois en cours) ne compte
+// pas tant qu'il n'a pas eu lieu. Sans le plafond a aujourd'hui, un appel
+// programme en fin de mois se retrouvait compte comme deja fait des le jour
+// de sa prise de rendez-vous (constate par Marie le 20/08 : "Realise" a 3
+// alors qu'un seul des trois appels du mois avait reellement eu lieu).
 function compteAppelsDecouvertePeriode(prospects, clients, periode) {
   const debut = periodeRange(periode).debut;
-  const nProspects = prospects.filter(p => { const d = parseFrDate(p.dateAppelDecouverte); return d && d >= debut; }).length;
-  const nClients = clients.filter(c => { const d = parseFrDate(c.dateAppelDecouverte); return d && d >= debut; }).length;
+  const aujourdhui = today0();
+  const dansPeriode = d => d && d >= debut && d <= aujourdhui;
+  const nProspects = prospects.filter(p => dansPeriode(parseFrDate(p.dateAppelDecouverte))).length;
+  const nClients = clients.filter(c => dansPeriode(parseFrDate(c.dateAppelDecouverte))).length;
   return nProspects + nClients;
 }
 // Taux de conversion REEL appel -> client, calcule sur les appels dont
@@ -1672,6 +1729,13 @@ function renderProspectsTable(prospects) {
         </td>
         <td data-label="Appel découverte"><input class="note-input" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" data-action="update-field" data-champ="dateAppelDecouverte"></td>
         <td data-label="1er message"><input class="note-input" type="date" value="${frDateToIso(p.date1erMessage)}" data-action="update-field" data-champ="date1erMessage"></td>
+        <td data-label="Variante" title="Variante du 1er message envoyée (A = ancien, B = nouveau) — détectée automatiquement par le scan de messagerie si disponible, sinon à renseigner ici à la main">
+          <select class="note-input" data-action="update-field" data-champ="templateVarianteManuelle">
+            <option value="" ${!p.templateVarianteManuelle ? "selected" : ""}>—</option>
+            <option value="A" ${p.templateVarianteManuelle === "A" ? "selected" : ""}>A</option>
+            <option value="B" ${p.templateVarianteManuelle === "B" ? "selected" : ""}>B</option>
+          </select>
+        </td>
         <td data-label="Prochaine action">${prochaineActionHtml}</td>
         <td data-label="Email"><input class="note-input" value="${escapeHtml(p.email || "")}" placeholder="—" data-action="update-field" data-champ="email"></td>
         <td data-label="Téléphone"><input class="note-input" value="${escapeHtml(p.telephone || "")}" placeholder="—" data-action="update-field" data-champ="telephone"></td>
@@ -1690,12 +1754,12 @@ function renderProspectsTable(prospects) {
     <div class="table-wrap">
       <table class="table-prospects">
         <colgroup>
-          <col style="width:10%"><col style="width:13%"><col style="width:9%"><col style="width:5%">
+          <col style="width:10%"><col style="width:11%"><col style="width:9%"><col style="width:5%">
           <col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:7%">
-          <col style="width:9%"><col style="width:7%"><col style="width:6%"><col style="width:8%">
+          <col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:6%"><col style="width:6%">
           <col style="width:5%">
         </colgroup>
-        <thead><tr><th>Nom</th><th>Poste</th><th>LinkedIn</th><th>Canal</th><th class="th-sortable" onclick="toggleSort('statut')">Statut${arrow("statut")}</th><th class="th-sortable" onclick="toggleSort('temperature')">T°${arrow("temperature")}</th><th>Appel<br>découverte</th><th>1er<br>message</th><th>Prochaine<br>action</th><th>Email</th><th>Téléphone</th><th>Note</th><th></th></tr></thead>
+        <thead><tr><th>Nom</th><th>Poste</th><th>LinkedIn</th><th>Canal</th><th class="th-sortable" onclick="toggleSort('statut')">Statut${arrow("statut")}</th><th class="th-sortable" onclick="toggleSort('temperature')">T°${arrow("temperature")}</th><th>Appel<br>découverte</th><th>1er<br>message</th><th title="Variante du 1er message (A/B)">Var.</th><th>Prochaine<br>action</th><th>Email</th><th>Téléphone</th><th>Note</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -1760,12 +1824,12 @@ function renderClientsTable(clients) {
           <option value="">—</option>${formuleOptions}
         </select>
       </td>
-      <td data-label="Montant"><input class="note-input" type="number" value="${Number(c.montant || 0)}" data-action="update-client-field" data-champ="montant"></td>
-      <td data-label="Canal"><select class="note-input" data-action="update-client-field" data-champ="canal">${canalOptionsHtml(c.canal)}</select></td>
-      <td data-label="Signature"><input class="note-input" type="date" value="${frDateToIso(c.date)}" data-action="update-client-field" data-champ="date"></td>
+      <td data-label="Montant"><input class="note-input champ-etroit" type="number" value="${Number(c.montant || 0)}" data-action="update-client-field" data-champ="montant"></td>
+      <td data-label="Canal"><select class="note-input champ-etroit" data-action="update-client-field" data-champ="canal">${canalOptionsHtml(c.canal)}</select></td>
+      <td data-label="Signature"><input class="note-input champ-date" type="date" value="${frDateToIso(c.date)}" data-action="update-client-field" data-champ="date"></td>
       <td data-label="Paiement">${paiementCellHtml(c)}</td>
-      <td data-label="NB Séances"><input class="note-input" style="max-width:90px;text-overflow:ellipsis;" title="Format : séance actuelle / nb total prévu, ex. 3/7" value="${escapeHtml(c.datesSeances || "")}" placeholder="ex: 3/7" data-action="update-client-field" data-champ="datesSeances"></td>
-      <td data-label="Fin"><input class="note-input" type="date" value="${frDateToIso(c.finAccompagnement)}" data-action="update-client-field" data-champ="finAccompagnement"></td>
+      <td data-label="Séances"><input class="note-input champ-etroit" title="Format : séance actuelle / nb total prévu, ex. 3/7" value="${escapeHtml(c.datesSeances || "")}" placeholder="ex: 3/7" data-action="update-client-field" data-champ="datesSeances"></td>
+      <td data-label="Fin"><input class="note-input champ-date" type="date" value="${frDateToIso(c.finAccompagnement)}" data-action="update-client-field" data-champ="finAccompagnement"></td>
       <td data-label="Prochaine action"><input class="note-input" value="${escapeHtml(c.prochaineAction || "")}" placeholder="—" data-action="update-client-field" data-champ="prochaineAction"></td>
       <td data-label="Commentaire"><input class="note-input" value="${escapeHtml(c.commentaire || "")}" placeholder="—" data-action="update-client-field" data-champ="commentaire"></td>
       <td><div class="row-actions"><button class="link-btn" data-action="delete-client" data-nom="${escapeHtml(c.nom)}">Supprimer</button></div></td>
@@ -1775,8 +1839,11 @@ function renderClientsTable(clients) {
 
   return `
     <div class="table-wrap">
-      <table>
-        <thead><tr><th>Nom</th><th>Formule</th><th>Montant</th><th>Canal</th><th>Signature</th><th title="Nombre de versements + date du 1er versement — les échéances mensuelles et le reste dû se calculent automatiquement à partir du Montant">Paiement</th><th title="Format libre : séance actuelle / nb total prévu, ex. 3/7">NB Séances</th><th>Fin</th><th>Prochaine action</th><th>Commentaire</th><th></th></tr></thead>
+      <table class="table-clients">
+        <colgroup>
+          <col style="width:15%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:10%"><col style="width:15%"><col style="width:6%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:6%">
+        </colgroup>
+        <thead><tr><th>Nom</th><th>Formule</th><th>Montant</th><th>Canal</th><th>Signature</th><th title="Nombre de versements + date du 1er versement — les échéances mensuelles et le reste dû se calculent automatiquement à partir du Montant">Paiement</th><th title="Format libre : séance actuelle / nb total prévu, ex. 3/7">Séances</th><th>Fin</th><th>Prochaine action</th><th>Commentaire</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -1839,9 +1906,14 @@ function pieChartHtml(segments, sizePx) {
 // proportion de prospects arrives jusque-la).
 // Couleur pilotee par le % (pas par la position de l'etape) -- Marie a
 // signale le 16/08 que les couleurs cyclees ne correspondaient pas aux
-// pourcentages affiches (ex. Relance 2 a 27% en vert). Memes seuils que
-// couleurTauxParSeuil (rouge <=30 / jaune <=70 / vert >70), mais avec la
-// palette rose/jaune citron/vert pomme (pas bordeaux/ambre/succes).
+// pourcentages affiches (ex. Relance 2 a 27% en vert), memes seuils que
+// couleurTauxParSeuil (rouge <=30 / jaune <=70 / vert >70). Le 19/08, un
+// premier essai a remplace la palette dediee (rose/jaune citron/vert pomme)
+// par la palette bordeaux/ambre/succes -- Marie a precise qu'elle aimait
+// bien l'identite rose/jaune/vert d'origine, le probleme etait juste que ces
+// teintes etaient trop pales/transparentes pour ressortir (pas la palette en
+// elle-meme) : on revient donc a une palette dediee (--viz-funnel-1/2/3),
+// mais nettement plus saturee que l'originale du 16/08.
 function couleurFunnelParSeuil(pct) {
   if (pct <= 30) return "var(--viz-funnel-1)";
   if (pct <= 70) return "var(--viz-funnel-2)";
@@ -1879,7 +1951,7 @@ function funnelHtml(etapes) {
         // le % affiche (pct), pas la valeur brute (e.valeur peut etre > 0 tout en
         // arrondissant a 0%).
         const largeur = pct !== null ? (pct > 0 ? Math.max(2, Math.min(pct, 100)) : 0) : 2;
-        const couleur = pct !== null ? couleurFunnelParSeuil(Math.min(pct, 100)) : "var(--viz-funnel-1)";
+        const couleur = pct !== null ? couleurFunnelParSeuil(Math.min(pct, 100)) : "var(--text-muted)";
         const pctMoisBrut = (e.base && e.valeurMois !== undefined) ? Math.round((e.valeurMois / e.base) * 100) : null;
         const pctSemaineBrut = (e.base && e.valeurSemaine !== undefined) ? Math.round((e.valeurSemaine / e.base) * 100) : null;
         const pctMois = pctMoisBrut !== null ? (pctMoisBrut > 0 ? Math.max(2, Math.min(100, pctMoisBrut)) : 0) : null;
@@ -2054,17 +2126,9 @@ const SEUIL_FIABLE_TAUX = 5;
 // Graphique dedie au taux de reponse par etape ("efficacite de mes messages"),
 // separe du funnel de volume ci-dessous -- avant, ce chiffre etait relegue en
 // petite note grise sous chaque barre du funnel, invisible au premier regard.
-// Couleur "feu tricolore" par seuil de performance (0-30% rouge / 30-75%
-// ambre / 75-100% vert) plutot qu'une identite fixe par etape -- demande
-// explicite de Marie le 16/08 pour voir d'un coup d'oeil ou ca va mal.
-// Reutilise les couleurs de statut deja existantes ailleurs dans l'appli
-// (bordeaux = urgent/en retard, ambre = intermediaire, success = signe/bon)
-// plutot que d'inventer une nouvelle palette.
-function couleurTauxParSeuil(pct) {
-  if (pct <= 30) return "var(--bordeaux)";
-  if (pct <= 70) return "var(--amber)";
-  return "var(--success)";
-}
+// Meme palette et memes seuils que le funnel "Ou est-ce que ca bloque ?"
+// (couleurFunnelParSeuil, --viz-funnel-1/2/3) -- demande de Marie le 20/08,
+// les deux graphiques cote a cote doivent parler le meme langage couleur.
 // Suggestion d'action quand un taux est mauvais (fiable ET <= 30%) : rappelle
 // le texte du template actuellement actif pour cette etape, avec un lien vers
 // l'edition -- pas de proposition automatique de nouveau texte (Marie ne veut
@@ -2085,11 +2149,76 @@ function tauxReponseBarsHtml(infos) {
         return `
           <div class="taux-bar-col">
             <div class="taux-bar-col__value">${r.den ? pct + "%" : "—"} <span class="muted">(${r.num}/${r.den})</span></div>
-            <div class="taux-bar-col__track"><div class="taux-bar-col__fill ${fiable ? "" : "taux-bar-col__fill--muted"}" style="height:${hauteur}%;${fiable ? `background:${couleurTauxParSeuil(pct)}` : ""}"></div></div>
+            <div class="taux-bar-col__track"><div class="taux-bar-col__fill ${fiable ? "" : "taux-bar-col__fill--muted"}" style="height:${hauteur}%;${fiable ? `background:${couleurFunnelParSeuil(pct)}` : ""}"></div></div>
             <div class="taux-bar-col__label">${escapeHtml(r.label)}</div>
           </div>
         `;
       }).join("")}
+    </div>
+  `;
+}
+// Test A/B du template "Nouveau" (1er message) -- Marie a affine un nouveau
+// texte (B) le 18/08 et veut comparer son taux de reponse a l'ancien (A).
+// Deux sources pour connaitre la variante envoyee, combinees -- demande
+// explicite de Marie le 19/08 : le scan de messagerie (p.templateVariante,
+// "Ancien"/"Nouveau", detecte automatiquement par Code.gs via les motifs du
+// dernier message envoye) va etre de moins en moins utilise par Marie, qui
+// prefere desormais renseigner la variante a la main directement dans le
+// tableau Prospects (p.templateVarianteManuelle, "A"/"B", colonne dediee
+// pour ne jamais entrer en conflit avec l'ecriture auto du scan). La saisie
+// manuelle est prioritaire quand les deux existent (c'est Marie qui sait ce
+// qu'elle a reellement envoye) ; sinon on retombe sur le scan. Un prospect
+// contacte mais ni scanne ni renseigne a la main n'entre dans aucun groupe.
+// Taux de reponse GLOBAL (a-t-elle repondu, un jour, peu importe quand) --
+// pas de ventilation par etape ici : comme le taux de reponse par etape
+// juste au-dessus, une reponse tardive apres une relance est comptee sans
+// qu'on puisse prouver qu'elle repond specifiquement au 1er message plutot
+// qu'a la relance -- caveat assume, rappele dans le texte affiche a Marie.
+// Date d'introduction du template B -- avant cette date, seul le template A
+// existait. Demande de Marie le 20/08 : le scan de messagerie ne tague la
+// variante (colonne AB) que quand le DERNIER message envoye est encore le
+// 1er (stade 0, voir matcherReponses/Code.gs) -- des qu'une relance part,
+// cette info n'est plus jamais ecrite, alors qu'un 1er message envoye avant
+// le lancement de B ne peut logiquement etre que "A", relance ou pas.
+// Deduction par date plutot que par Nb relances : reste correcte indefiniment
+// (contrairement a un seuil "deja relance = A", qui deviendrait faux des que
+// des destinataires du template B commenceront eux-memes a atteindre la
+// relance 1, ~J+5 apres son lancement).
+const DATE_INTRO_TEMPLATE_B = new Date(2026, 7, 18);
+function variantePourStats(p) {
+  if (p.templateVarianteManuelle === "A" || p.templateVarianteManuelle === "B") return p.templateVarianteManuelle;
+  if (p.templateVariante === "Nouveau") return "B";
+  if (p.templateVariante === "Ancien") return "A";
+  const dPremierMessage = parseFrDate(p.date1erMessage);
+  if (dPremierMessage && dPremierMessage < DATE_INTRO_TEMPLATE_B) return "A";
+  return null;
+}
+function statsTemplateABData(prospects) {
+  const contactes = prospects.filter(p => !!p.date1erMessage || (Number(p.nbRelances) || 0) > 0);
+  const parVariante = { A: [], B: [] };
+  contactes.forEach(p => {
+    const v = variantePourStats(p);
+    if (v) parVariante[v].push(p);
+  });
+  const calc = liste => {
+    const total = liste.length;
+    const repondus = liste.filter(p => !!p.dateReponse).length;
+    return { total, repondus, pct: total ? Math.round((repondus / total) * 100) : null };
+  };
+  return { A: calc(parVariante.A), B: calc(parVariante.B) };
+}
+function templateABHtml(abData) {
+  const ligne = (label, info) => `
+    <div class="tplab-col">
+      <div class="stat__value">${info.total ? info.pct + "%" : "—"}</div>
+      <div class="stat__label">${escapeHtml(label)} ${info.total ? `(${info.repondus}/${info.total})` : "(aucun envoi identifié)"}</div>
+    </div>
+  `;
+  return `
+    <div class="viz-block__title" style="margin-top:1.1rem;font-size:12.5px;">Test A/B — 1er message</div>
+    <div class="tplab-row">
+      ${ligne("Template A (ancien)", abData.A)}
+      ${ligne("Template B (nouveau)", abData.B)}
     </div>
   `;
 }
@@ -2143,10 +2272,13 @@ function renderStatsSection(data) {
   // cible, Pas maintenant = timing, "Appel découverte" = decision pas
   // encore prise).
   const appelsNonSignes = appelsListe.filter(a => a.statut !== "Client");
-  // "A venir" = appel pas encore resolu (statut encore "Appel decouverte") --
-  // distinct des issues resolues (Hors cible, Pas maintenant, etc). Avant,
-  // "n'ont pas signe" melangeait les deux, ce qui rendait le chiffre trivial
-  // (= total - signes, aucune info nouvelle). Demande de Marie le 16/08.
+  // "A classer" (libelle "A venir" jusqu'au 20/08, renomme -- melangeait
+  // appels deja passes mais pas encore classes et appels reellement futurs,
+  // repere par Marie) = appel pas encore resolu (statut encore "Appel
+  // decouverte"), qu'il ait deja eu lieu ou non -- distinct des issues
+  // resolues (Hors cible, Pas maintenant, etc). Avant, "n'ont pas signe"
+  // melangeait les deux, ce qui rendait le chiffre trivial (= total -
+  // signes, aucune info nouvelle). Demande de Marie le 16/08.
   const appelsAVenir = appelsNonSignes.filter(a => a.statut === "Appel découverte");
 
   // Origine editable directement dans ce tableau (via la delegation d'evenement
@@ -2260,9 +2392,14 @@ function renderStatsSection(data) {
           <div class="viz-block__title">Où est-ce que ça bloque ?</div>
           <p class="muted" style="margin-bottom:0.6rem;">% = conversion depuis l'étape précédente.</p>
           <div class="funnel-legend">
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:0.16;"></span>Global</span>
+            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:0.3;"></span>Global</span>
             <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:0.58;"></span>Ce mois</span>
             <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:1;"></span>Cette semaine</span>
+          </div>
+          <div class="funnel-legend" style="margin-top:-0.5rem;">
+            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-1);opacity:1;"></span>≤ 30% — bloque</span>
+            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-2);opacity:1;"></span>31–70% — moyen</span>
+            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-3);opacity:1;"></span>&gt; 70% — bon</span>
           </div>
           ${funnelHtml([
             { label: "Contactés (1er message envoyé)", valeur: funnel.nContactes, base: prospects.length, baseLabel: "des prospects", valeurMois: contactesMois, valeurSemaine: contactesSemaine },
@@ -2280,11 +2417,12 @@ function renderStatsSection(data) {
           <div class="viz-block__title">Taux de réponses aux messages</div>
           <p class="muted" style="margin-bottom:0.6rem;">Scan de réconciliation en cours — ces taux vont remonter au fur et à mesure. Barres grisées = n&lt;${SEUIL_FIABLE_TAUX}.</p>
           ${tauxReponseBarsHtml(tauxReponseInfosCalculees)}
+          ${templateABHtml(statsTemplateABData(prospects))}
           ${appelsNonSignes.length ? `
             <div class="viz-block__title" style="margin-top:1.1rem;font-size:12.5px;">Appels découverte</div>
             <div class="stats stats--compact">
               <div class="stat"><div class="stat__value stat__value--success">${appelsListe.length - appelsNonSignes.length}</div><div class="stat__label">Ont signé (sur ${appelsListe.length})</div></div>
-              <div class="stat"><div class="stat__value">${appelsAVenir.length}</div><div class="stat__label">À venir</div></div>
+              <div class="stat"><div class="stat__value">${appelsAVenir.length}</div><div class="stat__label">À classer</div></div>
               <div class="stat"><div class="stat__value">${Math.round(noShowRateGlobal(data.historiqueAppels) * 100)}%</div><div class="stat__label">No-show</div></div>
               <div class="stat"><div class="stat__value">${tauxAvecEffectif(appelsListe.length - appelsNonSignes.length, appelsListe.length)}</div><div class="stat__label">Signatures/appels</div></div>
             </div>
@@ -2591,13 +2729,29 @@ async function submitAddProspect() {
 }
 
 function openTemplatesModal() {
+  const obj = (currentData.objectifs) || {};
+  const nouveauA = obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"];
+  const nouveauB = obj.templateNouveauB || DEFAULT_MESSAGE_TEMPLATES["Nouveau B"];
+  const actif = obj.templateNouveauActif || DEFAULT_TEMPLATE_NOUVEAU_ACTIF;
   const t = messageTemplatesActuels();
   const rappel = (currentData.objectifs && currentData.objectifs.templateRappel) || DEFAULT_TEMPLATE_RAPPEL;
   const zoneStyle = "width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;";
   document.getElementById("modal-content").innerHTML = `
     <h2>Templates de messages</h2>
-    <label>Message — Nouveau contact</label>
-    <textarea id="tpl-nouveau" rows="7" style="${zoneStyle}">${escapeHtml(t["Nouveau"])}</textarea>
+    <label>Message — Nouveau contact (A/B)</label>
+    <div style="display:flex;gap:1.25rem;margin-top:0.35rem;font-size:13px;">
+      <label style="display:flex;align-items:center;gap:5px;text-transform:none;font-size:13px;letter-spacing:0;margin:0;">
+        <input type="radio" name="tpl-nouveau-actif" value="A" ${actif === "A" ? "checked" : ""}> Template A (ancien)
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;text-transform:none;font-size:13px;letter-spacing:0;margin:0;">
+        <input type="radio" name="tpl-nouveau-actif" value="B" ${actif === "B" ? "checked" : ""}> Template B (nouveau)
+      </label>
+    </div>
+    <p class="muted" style="margin-top:0.35rem;">Le template coché est celui utilisé partout (Rafale, copie manuelle) pour le 1er message.</p>
+    <label style="margin-top:0.75rem;">Template A</label>
+    <textarea id="tpl-nouveau-a" rows="7" style="${zoneStyle}">${escapeHtml(nouveauA)}</textarea>
+    <label style="margin-top:0.75rem;">Template B</label>
+    <textarea id="tpl-nouveau-b" rows="7" style="${zoneStyle}">${escapeHtml(nouveauB)}</textarea>
     <label style="margin-top:1rem;">Message — Première relance</label>
     <textarea id="tpl-r1" rows="4" style="${zoneStyle}">${escapeHtml(t["Première relance"])}</textarea>
     <label style="margin-top:1rem;">Message — Deuxième relance</label>
@@ -2606,7 +2760,7 @@ function openTemplatesModal() {
     <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
     <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
-    <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les 5 messages.</p>
+    <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les templates.</p>
     <div class="modal-actions">
       <button class="btn btn--ghost" onclick="closeModal()">Annuler</button>
       <button class="btn" id="tpl-submit-btn" onclick="submitTemplates()">Enregistrer les templates</button>
@@ -2624,9 +2778,12 @@ async function submitTemplates() {
   btn.textContent = "Enregistrement...";
   let res;
   try {
+    const actifEl = document.querySelector('input[name="tpl-nouveau-actif"]:checked');
     res = await jsonpCall({
       action: "setObjectifs",
-      templateNouveau: document.getElementById("tpl-nouveau").value,
+      templateNouveau: document.getElementById("tpl-nouveau-a").value,
+      templateNouveauB: document.getElementById("tpl-nouveau-b").value,
+      templateNouveauActif: actifEl ? actifEl.value : DEFAULT_TEMPLATE_NOUVEAU_ACTIF,
       templatePremiereRelance: document.getElementById("tpl-r1").value,
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
       templateRepriseContact: document.getElementById("tpl-reprise").value,
