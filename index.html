@@ -1745,12 +1745,10 @@ function renderProspectsTable(prospects) {
         </td>
         <td data-label="Appel découverte">
           <input class="note-input" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" data-action="update-field" data-champ="dateAppelDecouverte">
-          ${p.dateAppelDecouverte ? `
-            <label class="no-show-check">
-              <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} data-action="update-field-checkbox" data-champ="noShowAppelDecouverte">
-              No-show
-            </label>
-          ` : ""}
+          <label class="no-show-check">
+            <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} data-action="update-field-checkbox" data-champ="noShowAppelDecouverte">
+            No-show
+          </label>
         </td>
         <td data-label="1er message"><input class="note-input" type="date" value="${frDateToIso(p.date1erMessage)}" data-action="update-field" data-champ="date1erMessage"></td>
         <td data-label="Variante" title="Variante du 1er message envoyée (A = ancien, B = nouveau) — détectée automatiquement par le scan de messagerie si disponible, sinon à renseigner ici à la main">
@@ -2723,12 +2721,10 @@ function openHistoriqueModal(ligne) {
       <div style="flex:1;min-width:140px;">
         <label>Appel découverte</label>
         <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" onchange="updateField(${ligne}, 'dateAppelDecouverte', this.value)">
-        ${p.dateAppelDecouverte ? `
-          <label class="no-show-check">
-            <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} onchange="updateField(${ligne}, 'noShowAppelDecouverte', this.checked ? 'true' : 'false')">
-            No-show
-          </label>
-        ` : ""}
+        <label class="no-show-check">
+          <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} onchange="updateField(${ligne}, 'noShowAppelDecouverte', this.checked ? 'true' : 'false')">
+          No-show
+        </label>
       </div>
     </div>
     ${listeHtml}
