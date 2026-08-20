@@ -2698,12 +2698,23 @@ function openHistoriqueModal(ligne) {
     && !((Number(p.nbRelances) || 0) === 0 && p.date1erMessage)) {
     evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel, champs: ["dateRappel"] });
   }
-  if (p.dateReponse) evenements.push({ label: "Date de première réponse", date: p.dateReponse, champs: ["dateReponse"] });
+  // Libelle retravaille le 20/08 (etait "Date de premiere reponse") : pour
+  // ~97% des prospects avec une reponse enregistree, cette date vient du
+  // scan de reconciliation qui l'a DETECTEE a posteriori (voir
+  // enregistrerReponseSiAbsente/Code.gs) -- elle tamponne le jour du scan,
+  // pas le jour reel de la reponse sur LinkedIn (souvent inconnu, l'apercu
+  // de conversation ne donne pas l'historique complet). Marie a efface ce
+  // champ sur plusieurs fiches en pensant que la date etait fausse/un bug,
+  // sans savoir qu'il alimente le taux de reponse de l'onglet Stats --
+  // reformule pour que ce soit clair sans avoir a le deviner, et
+  // effacerEvenementFiche() ajoute desormais un avertissement specifique a
+  // cet evenement plutot que le message generique.
+  if (p.dateReponse) evenements.push({ label: "Réponse détectée le", suffixe: " (pas forcément le jour réel de la réponse — sert au taux de réponse dans Stats)", date: p.dateReponse, champs: ["dateReponse"] });
   if (p.dateAttenteConnexion) evenements.push({ label: "En attente de connexion depuis", date: p.dateAttenteConnexion, champs: ["dateAttenteConnexion"] });
   evenements.sort((a, b) => (parseFrDate(a.date) || 0) - (parseFrDate(b.date) || 0));
 
   const listeHtml = evenements.length
-    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.label)}</b> — ${escapeHtml(ev.date)} <button class="link-btn" onclick="effacerEvenementFiche(${ligne}, ${JSON.stringify(ev.champs).replace(/"/g, "&quot;")}, '${ev.label.replace(/'/g, "\\'")}')">Effacer</button></li>`).join("")}</ul>`
+    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.label)}</b> — ${escapeHtml(ev.date)}${ev.suffixe ? `<span class="muted">${escapeHtml(ev.suffixe)}</span>` : ""} <button class="link-btn" onclick="effacerEvenementFiche(${ligne}, ${JSON.stringify(ev.champs).replace(/"/g, "&quot;")}, '${ev.label.replace(/'/g, "\\'")}')">Effacer</button></li>`).join("")}</ul>`
     : `<p class="muted">Aucun événement daté pour le moment.</p>`;
 
   document.getElementById("modal-content").innerHTML = `
@@ -2749,7 +2760,16 @@ async function submitHistoriqueNote(ligne) {
 // (pas Promise.all) car updateField() mute currentData de facon optimiste :
 // en parallele, deux appels pourraient se marcher dessus sur la meme ligne.
 async function effacerEvenementFiche(ligne, champs, label) {
-  if (!confirm("Effacer \"" + label + "\" de la fiche ?")) return;
+  // Avertissement specifique pour "Reponse detectee le" (champ dateReponse) :
+  // contrairement aux autres evenements effacables ici, celui-ci alimente
+  // directement le taux de reponse de l'onglet Stats -- l'effacer fait
+  // disparaitre cette personne du calcul, silencieusement. Incident du
+  // 20/08 : Marie en avait efface plusieurs, pensant corriger une date
+  // erronee, sans savoir que ca faussait les Stats.
+  const messageConfirm = champs.includes("dateReponse")
+    ? "Effacer \"" + label + "\" ? Cette personne ne comptera plus comme ayant répondu dans le taux de réponse (onglet Stats)."
+    : "Effacer \"" + label + "\" de la fiche ?";
+  if (!confirm(messageConfirm)) return;
   for (const spec of champs) {
     const [champ, valeur] = spec.split(":");
     if (!(await updateField(ligne, champ, valeur !== undefined ? valeur : ""))) return;
