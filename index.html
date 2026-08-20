@@ -3275,9 +3275,10 @@ function renderRafaleActionCard() {
       ${rafaleEnTeteHtml(p, total)}
       <p class="muted" style="margin-bottom:1rem;">${escapeHtml(cfg.libelle(j))}</p>
       <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">${boutonsHtml}</div>
-      <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1${cfg.boutons.length > 1 ? " / 2" : ""}${cfg.boutons.length > 2 ? " / 3" : ""}, Retour arrière = précédent, Échap = quitter.</p>
+      <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1${cfg.boutons.length > 1 ? " / 2" : ""}${cfg.boutons.length > 2 ? " / 3" : ""}, Entrée = suivant sans décider, Retour arrière = précédent, Échap = quitter.</p>
       <div class="modal-actions" style="margin-top:1.5rem;">
         ${boutonPrecedent}
+        <button class="btn btn--ghost" onclick="rafaleActionsSuivantSansDecider()">Suivant (Entrée) →</button>
         <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
       </div>
     `;
@@ -3331,6 +3332,17 @@ async function rafaleActionsEnvoyerSuivant() {
   rafaleIndex++;
   renderRafaleActionCard();
 }
+// Passe au candidat suivant sans classer celui-ci -- demande de Marie le
+// 20/08 (cas Thomas Thourel : elle veut attendre 24h avant de decider "Devient
+// cliente"/"Pas maintenant"/"Hors cible", et sans ce bouton la carte de
+// decision bloquait tout le reste de la file tant qu'aucun des 3 boutons
+// n'etait clique). N'ecrit rien -- la personne revient dans la file la
+// prochaine fois que Rafale : actions est rouverte (estADecider() la
+// reproposera tant qu'elle n'est pas classee).
+function rafaleActionsSuivantSansDecider() {
+  rafaleIndex++;
+  renderRafaleActionCard();
+}
 async function rafaleActionsDecisionClasser(statutCible) {
   const p = rafaleQueue[rafaleIndex];
   if (statutCible === "Client") {
@@ -3370,6 +3382,9 @@ document.addEventListener("keydown", (e) => {
       if (idx !== -1 && cfg.boutons[idx]) {
         const label = cfg.boutons[idx];
         rafaleActionsDecisionClasser(label === "Devient cliente" ? "Client" : label);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        rafaleActionsSuivantSansDecider();
       }
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
