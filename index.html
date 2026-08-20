@@ -278,6 +278,7 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .paiement-reste { font-size: 11.5px; margin-bottom: 4px; }
 .paiement-reste b { font-family: 'Cormorant Garamond', serif; font-size: 14px; }
 .paiement-echec { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--bordeaux); cursor: pointer; }
+.no-show-check { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--bordeaux); cursor: pointer; margin-top: 3px; white-space: nowrap; }
 .paiement-label { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
 
 .alerte-seuil { padding: 0.85rem 1.1rem; border: 0.5px solid; font-size: 12.5px; margin-top: 1rem; }
@@ -600,7 +601,7 @@ function isoDateToFr(str) {
 // attend systematiquement du JJ/MM/AAAA, jamais de l'ISO).
 const CHAMPS_DATE = ["dateAppelDecouverte", "dateRappel", "date1erMessage", "date", "finAccompagnement", "date1erVersement"];
 function coerceValeurLocale(champ, valeur) {
-  if (champ === "echecPaiement") return valeur === "true";
+  if (champ === "echecPaiement" || champ === "noShowAppelDecouverte") return valeur === "true";
   if (CHAMPS_DATE.indexOf(champ) !== -1) return isoDateToFr(valeur);
   return valeur;
 }
@@ -1034,7 +1035,15 @@ function rappelsADemainHtml(prospects, obj) {
           <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
         </div>
       `).join("")}</div>` : ""}
-      ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `<div class="rappel-item"><span>${nomFicheHtml(p)} — appel tenu, à évaluer</span></div>`).join("")}</div>` : ""}
+      ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `
+        <div class="rappel-item">
+          <span>${nomFicheHtml(p)} — appel tenu, à évaluer</span>
+          <label class="no-show-check">
+            <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} data-action="update-field-checkbox" data-champ="noShowAppelDecouverte" data-ligne="${p.ligne}">
+            No-show
+          </label>
+        </div>
+      `).join("")}</div>` : ""}
     </div>` : "";
 
   const groupeReprise = repriseADecider.length ? `
@@ -1727,7 +1736,15 @@ function renderProspectsTable(prospects) {
             <option value="">—</option>${tempOptions}
           </select>
         </td>
-        <td data-label="Appel découverte"><input class="note-input" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" data-action="update-field" data-champ="dateAppelDecouverte"></td>
+        <td data-label="Appel découverte">
+          <input class="note-input" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" data-action="update-field" data-champ="dateAppelDecouverte">
+          ${p.dateAppelDecouverte ? `
+            <label class="no-show-check">
+              <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} data-action="update-field-checkbox" data-champ="noShowAppelDecouverte">
+              No-show
+            </label>
+          ` : ""}
+        </td>
         <td data-label="1er message"><input class="note-input" type="date" value="${frDateToIso(p.date1erMessage)}" data-action="update-field" data-champ="date1erMessage"></td>
         <td data-label="Variante" title="Variante du 1er message envoyée (A = ancien, B = nouveau) — détectée automatiquement par le scan de messagerie si disponible, sinon à renseigner ici à la main">
           <select class="note-input" data-action="update-field" data-champ="templateVarianteManuelle">
@@ -1818,7 +1835,7 @@ function renderClientsTable(clients) {
     const rowStyle = inactive ? "background:rgba(118,118,118,0.08);" : "background:rgba(21,128,61,0.05);";
     return `
     <tr data-ligne="${c.ligne}" style="${rowStyle}">
-      <td data-label="Nom"><div class="name-cell">${escapeHtml(c.nom)}</div>${sousLigne ? `<div class="muted">${escapeHtml(sousLigne)}</div>` : ""}</td>
+      <td data-label="Nom"><div class="name-cell name-cell--link" onclick="openClientModal(${c.ligne})" title="Voir la fiche">${escapeHtml(c.nom)}</div>${sousLigne ? `<div class="muted">${escapeHtml(sousLigne)}</div>` : ""}</td>
       <td data-label="Formule">
         <select class="formule-select ${formuleClass(c.formule)}" data-action="update-client-field" data-champ="formule">
           <option value="">—</option>${formuleOptions}
@@ -1827,6 +1844,7 @@ function renderClientsTable(clients) {
       <td data-label="Montant"><input class="note-input champ-etroit" type="number" value="${Number(c.montant || 0)}" data-action="update-client-field" data-champ="montant"></td>
       <td data-label="Canal"><select class="note-input champ-etroit" data-action="update-client-field" data-champ="canal">${canalOptionsHtml(c.canal)}</select></td>
       <td data-label="Signature"><input class="note-input champ-date" type="date" value="${frDateToIso(c.date)}" data-action="update-client-field" data-champ="date"></td>
+      <td data-label="Appel découverte"><input class="note-input champ-date" type="date" value="${frDateToIso(c.dateAppelDecouverte)}" data-action="update-client-field" data-champ="dateAppelDecouverte"></td>
       <td data-label="Paiement">${paiementCellHtml(c)}</td>
       <td data-label="Séances"><input class="note-input champ-etroit" title="Format : séance actuelle / nb total prévu, ex. 3/7" value="${escapeHtml(c.datesSeances || "")}" placeholder="ex: 3/7" data-action="update-client-field" data-champ="datesSeances"></td>
       <td data-label="Fin"><input class="note-input champ-date" type="date" value="${frDateToIso(c.finAccompagnement)}" data-action="update-client-field" data-champ="finAccompagnement"></td>
@@ -1841,9 +1859,9 @@ function renderClientsTable(clients) {
     <div class="table-wrap">
       <table class="table-clients">
         <colgroup>
-          <col style="width:15%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:10%"><col style="width:15%"><col style="width:6%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:6%">
+          <col style="width:13%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:7%"><col style="width:13%"><col style="width:6%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:6%">
         </colgroup>
-        <thead><tr><th>Nom</th><th>Formule</th><th>Montant</th><th>Canal</th><th>Signature</th><th title="Nombre de versements + date du 1er versement — les échéances mensuelles et le reste dû se calculent automatiquement à partir du Montant">Paiement</th><th title="Format libre : séance actuelle / nb total prévu, ex. 3/7">Séances</th><th>Fin</th><th>Prochaine action</th><th>Commentaire</th><th></th></tr></thead>
+        <thead><tr><th>Nom</th><th>Formule</th><th>Montant</th><th>Canal</th><th>Signature</th><th>Appel découv.</th><th title="Nombre de versements + date du 1er versement — les échéances mensuelles et le reste dû se calculent automatiquement à partir du Montant">Paiement</th><th title="Format libre : séance actuelle / nb total prévu, ex. 3/7">Séances</th><th>Fin</th><th>Prochaine action</th><th>Commentaire</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -2086,7 +2104,10 @@ function appelsDecouverteListe(prospects, clients) {
     if (p.dateAppelDecouverte) items.push({ ligne: p.ligne, nom: p.nom, poste: p.poste, temperature: p.temperature, canal: p.canal, origine: p.interetExprime, statut: p.statut, date: p.dateAppelDecouverte });
   });
   clients.forEach(c => {
-    if (c.dateAppelDecouverte) items.push({ ligne: null, nom: c.nom, poste: c.metier, temperature: "", canal: c.canal, origine: "", statut: "Client", date: c.dateAppelDecouverte });
+    // clientLigne (distinct de "ligne", reserve aux prospects) : evite tout
+    // risque qu'une ligne Clients atterrisse dans data-action="update-field"
+    // (endpoint Prospects) plus bas dans appelsRows -- voir openClientModal.
+    if (c.dateAppelDecouverte) items.push({ ligne: null, clientLigne: c.ligne, nom: c.nom, poste: c.metier, temperature: "", canal: c.canal, origine: "", statut: "Client", date: c.dateAppelDecouverte });
   });
   items.sort((a, b) => (parseFrDate(b.date) || 0) - (parseFrDate(a.date) || 0));
   return items;
@@ -2295,7 +2316,9 @@ function renderStatsSection(data) {
     const offre = a.temperature ? TEMP_VERS_OFFRE_SUGGEREE[a.temperature] : null;
     return `
     <tr ${a.ligne ? `data-ligne="${a.ligne}"` : ""}>
-      <td>${escapeHtml(a.nom || "")}</td>
+      <td>${a.ligne ? `<span class="name-cell--link" onclick="openHistoriqueModal(${a.ligne})">${escapeHtml(a.nom || "")}</span>`
+        : a.clientLigne ? `<span class="name-cell--link" onclick="openClientModal(${a.clientLigne})">${escapeHtml(a.nom || "")}</span>`
+        : escapeHtml(a.nom || "")}</td>
       <td class="muted">${escapeHtml(a.poste || "—")}</td>
       <td><span class="${tempClass(a.temperature)}" style="padding:3px 8px;border-radius:3px;font-size:11px;white-space:nowrap;">${escapeHtml(a.temperature || "—")}</span></td>
       <td>${escapeHtml(CANAL_LABELS[a.canal] || a.canal || "—")}</td>
@@ -2485,10 +2508,19 @@ function ajouterJoursFr(date, jours) {
 async function updateField(ligne, champ, valeur) {
   const p = currentData.prospects.find(x => x.ligne === ligne);
   let basculerVersPremiereRelance = false;
+  let reinitialiserNoShow = false;
   if (p) {
     p[champ] = coerceValeurLocale(champ, valeur);
     if (champ === "statut" && valeur === "Appel découverte") {
       p.dateAppelDecouverte = new Date().toLocaleDateString("fr-FR").replace(/\./g, "");
+    }
+    // Rebooker un appel (nouvelle Date appel decouverte) sur une fiche deja
+    // marquee no-show doit effacer ce flag -- sinon la fiche reste etiquetee
+    // "no-show" apres le nouveau rendez-vous, avant meme qu'il ait eu lieu.
+    // Demande de Marie le 20/08 (cas concret : Johann Poatty, no-show puis a
+    // recontacter).
+    if (champ === "dateAppelDecouverte" && p.noShowAppelDecouverte) {
+      reinitialiserNoShow = true;
     }
     if (champ === "date1erMessage") {
       const base = parseFrDate(p.date1erMessage);
@@ -2525,6 +2557,9 @@ async function updateField(ligne, champ, valeur) {
   }
   if (basculerVersPremiereRelance) {
     return await updateField(ligne, "statut", "Première relance");
+  }
+  if (reinitialiserNoShow) {
+    return await updateField(ligne, "noShowAppelDecouverte", "false");
   }
   // Popup facultatif (onglet Stats) pour savoir ce qui declenche un appel
   // decouverte -- ne bloque rien, l'enregistrement du Statut est deja fait
@@ -2577,6 +2612,53 @@ function closeModal() {
     pendingRevertSelect.value = pendingRevertSelect.dataset.prev || "";
     pendingRevertSelect = null;
   }
+}
+
+// Fiche cliente : contrairement aux prospects, tous les champs d'une cliente
+// sont deja editables directement dans le tableau Clients -- cette fiche
+// n'ajoute donc aucune donnee nouvelle, elle sert de vue recentree sur une
+// seule personne + de destination pour un nom cliquable ailleurs (ex. la
+// liste "Appels decouverte" de l'onglet Stats, qui melange prospects et
+// clientes). Demande de Marie le 20/08 (cas concret : Henri De Traux, deja
+// converti en cliente donc absent de Prospects, elle ne pouvait nulle part
+// lui ajouter/corriger sa Date appel decouverte -- champ qui existait cote
+// donnees depuis la conversion mais n'etait jamais expose dans le tableau
+// Clients). Les champs edites ici passent par updateClientField, exactement
+// comme depuis le tableau -- une seule source de verite, pas de duplication
+// de logique d'ecriture.
+function openClientModal(ligne) {
+  const c = currentData.clients.find(x => x.ligne === ligne);
+  if (!c) return;
+  document.getElementById("modal-content").innerHTML = `
+    <h2>${escapeHtml(c.nom)}</h2>
+    <p class="muted" style="margin-bottom:1rem;">${escapeHtml([c.metier, c.age ? c.age + " ans" : ""].filter(Boolean).join(" · ") || "—")}</p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <div style="flex:1;min-width:140px;">
+        <label>Appel découverte</label>
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.dateAppelDecouverte)}" onchange="updateClientField(${ligne}, 'dateAppelDecouverte', this.value)">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label>Signature</label>
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.date)}" onchange="updateClientField(${ligne}, 'date', this.value)">
+      </div>
+      <div style="flex:1;min-width:140px;">
+        <label>Fin d'accompagnement</label>
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.finAccompagnement)}" onchange="updateClientField(${ligne}, 'finAccompagnement', this.value)">
+      </div>
+    </div>
+    <label>Commentaire</label>
+    <textarea id="m-client-commentaire" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Les points importants...">${escapeHtml(c.commentaire || "")}</textarea>
+    <div class="modal-actions">
+      <button class="btn btn--ghost" onclick="closeModal()">Fermer</button>
+      <button class="btn" onclick="submitClientCommentaire(${ligne})">Enregistrer le commentaire</button>
+    </div>
+  `;
+  document.getElementById("modal-overlay").hidden = false;
+}
+async function submitClientCommentaire(ligne) {
+  const valeur = document.getElementById("m-client-commentaire").value;
+  await updateClientField(ligne, "commentaire", valeur);
+  closeModal();
 }
 
 // Fiche historique : recompile les dates deja presentes sur la fiche (aucune
@@ -2634,6 +2716,12 @@ function openHistoriqueModal(ligne) {
       <div style="flex:1;min-width:140px;">
         <label>Appel découverte</label>
         <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" onchange="updateField(${ligne}, 'dateAppelDecouverte', this.value)">
+        ${p.dateAppelDecouverte ? `
+          <label class="no-show-check">
+            <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} onchange="updateField(${ligne}, 'noShowAppelDecouverte', this.checked ? 'true' : 'false')">
+            No-show
+          </label>
+        ` : ""}
       </div>
     </div>
     ${listeHtml}
@@ -3383,6 +3471,12 @@ document.getElementById("app").addEventListener("change", (e) => {
   if (elChk) {
     const ligne = Number(elChk.closest("tr").dataset.ligne);
     updateClientField(ligne, elChk.dataset.champ, elChk.checked ? "true" : "false");
+    return;
+  }
+  const elPChk = e.target.closest("[data-action='update-field-checkbox']");
+  if (elPChk) {
+    const ligne = Number(elPChk.dataset.ligne || (elPChk.closest("tr") && elPChk.closest("tr").dataset.ligne));
+    updateField(ligne, elPChk.dataset.champ, elPChk.checked ? "true" : "false");
   }
 });
 
