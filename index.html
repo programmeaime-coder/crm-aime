@@ -748,6 +748,18 @@ function dateUrgence(p) {
   if (cfg && estADecider(p)) return parseFrDate(p[cfg.dateChamp]);
   return null;
 }
+// Accorde un mot au genre du prospect (champ Genre, "H"/"F"/vide) -- l'app
+// reste au feminin par defaut quand le genre n'est pas renseigne
+// (comportement historique, majorite de la clientele "AIME by M."). Ajoute
+// le 20/08 suite au signalement de Marie ("Devient cliente" propose a tort
+// pour Thomas Thourel, un homme) -- seuls les 2 textes lies a une PERSONNE
+// precise (bouton de decision Rafale, titre "Convertir ... en client·e")
+// sont concernes ; le reste du vocabulaire de l'app (onglet "Clientes",
+// bouton "+ Ajouter une cliente", messages vides) reste volontairement
+// inchange, ce n'est pas lie a une fiche individuelle.
+function accordGenre(motFeminin, motMasculin, genre) {
+  return genre === "H" ? motMasculin : motFeminin;
+}
 function escapeHtml(str) {
   return String(str == null ? "" : str)
     .replace(/&/g, "&amp;")
@@ -1708,7 +1720,8 @@ function renderProspectsTable(prospects) {
       if (j !== null && j >= cfg.delaiJours) {
         const boutonsHtml = cfg.boutons.map(label => {
           const statutCible = label === "Devient cliente" ? "Client" : label;
-          return `<button class="link-btn" data-action="classer-decision" data-ligne="${p.ligne}" data-statut="${escapeHtml(statutCible)}" data-nom="${escapeHtml(p.nom)}">${escapeHtml(label)}</button>`;
+          const libelle = label === "Devient cliente" ? accordGenre("Devient cliente", "Devient client", p.genre) : label;
+          return `<button class="link-btn" data-action="classer-decision" data-ligne="${p.ligne}" data-statut="${escapeHtml(statutCible)}" data-nom="${escapeHtml(p.nom)}">${escapeHtml(libelle)}</button>`;
         }).join(" ");
         prochaineActionHtml = `<span class="next-action next-action--overdue">${escapeHtml(cfg.libelle(j))}</span>
           <div>${boutonsHtml}</div>`;
@@ -2737,6 +2750,14 @@ function openHistoriqueModal(ligne) {
           No-show
         </label>
       </div>
+      <div style="flex:1;min-width:110px;">
+        <label>Genre</label>
+        <select class="note-input" style="width:100%;" onchange="updateField(${ligne}, 'genre', this.value)">
+          <option value="" ${!p.genre ? "selected" : ""}>—</option>
+          <option value="F" ${p.genre === "F" ? "selected" : ""}>Femme</option>
+          <option value="H" ${p.genre === "H" ? "selected" : ""}>Homme</option>
+        </select>
+      </div>
     </div>
     ${listeHtml}
     <p class="muted" style="margin-top:0.5rem;">Effacer un événement corrige aussi Nb relances si besoin, pour que la fiche reste cohérente avec le statut (change le statut via le tableau si besoin).</p>
@@ -2916,8 +2937,10 @@ async function submitTemplates() {
 
 function openConvertModal(ligne, nom, revertSelect) {
   pendingRevertSelect = revertSelect || null;
+  const p = currentData.prospects.find(x => x.ligne === ligne);
+  const motCliente = accordGenre("cliente", "client", p && p.genre);
   document.getElementById("modal-content").innerHTML = `
-    <h2>Convertir ${escapeHtml(nom)} en cliente</h2>
+    <h2>Convertir ${escapeHtml(nom)} en ${motCliente}</h2>
     <label>Formule</label>
     <select id="m-formule" onchange="onFormuleChange(this, 'm-montant')">${formuleOptionsHtml()}</select>
     <label>Montant (€)</label><input id="m-montant" type="number">
@@ -3285,7 +3308,8 @@ function renderRafaleActionCard() {
     const j = joursEcoules(p[cfg.dateChamp]);
     const boutonsHtml = cfg.boutons.map((label, i) => {
       const statutCible = label === "Devient cliente" ? "Client" : label;
-      return `<button class="btn ${i === 0 ? "" : "btn--ghost"}" onclick="rafaleActionsDecisionClasser('${statutCible.replace(/'/g, "\\'")}')">${i + 1} · ${escapeHtml(label)}</button>`;
+      const libelle = label === "Devient cliente" ? accordGenre("Devient cliente", "Devient client", p.genre) : label;
+      return `<button class="btn ${i === 0 ? "" : "btn--ghost"}" onclick="rafaleActionsDecisionClasser('${statutCible.replace(/'/g, "\\'")}')">${i + 1} · ${escapeHtml(libelle)}</button>`;
     }).join(" ");
     document.getElementById("rafale-content").innerHTML = `
       ${rafaleEnTeteHtml(p, total)}
