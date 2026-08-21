@@ -549,6 +549,22 @@ Si l'idée te plaît, j'aimerais te proposer un appel découverte (offert et san
 Dis-moi simplement si ça t'intéresse, et sens-toi aussi parfaitement à l'aise de me dire que ce n'est pas le bon moment pour toi, je comprends très bien.
 
 Au plaisir d'avoir de tes nouvelles, je te souhaite une belle journée,
+Marie 🌞`,
+  // Distinct de "Reprise de contact" (relance d'une conversation qui a
+  // deja eu lieu) : "Recontacter" s'adresse a un contact reclasse froid il
+  // y a longtemps (6 mois+, voir SEUIL_RECONTACTER_JOURS cote Code.gs) sans
+  // jamais avoir vraiment echange -- garde un ton plus proche du 1er
+  // message que d'une reprise de fil. Ajoute le 21/08 (Marie ajoutee a
+  // Rafale : actions, ce statut n'avait jusque-la aucun template).
+  "Recontacter": `Hello {prenom},
+
+On s'était suivi·es il y a un moment sur LinkedIn, je me permets de refaire signe !
+
+De mon côté j'accompagne toujours les gens vers une vie de couple heureuse et équilibrée, et je me demandais où tu en étais aujourd'hui sur le sujet.
+
+Si l'idée te parle, je serais ravie d'échanger — sinon aucun souci, dis-le moi simplement.
+
+Belle journée,
 Marie 🌞`
 };
 
@@ -1006,7 +1022,8 @@ function messageTemplatesActuels() {
     "Nouveau": nouveauTexte,
     "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
     "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"],
-    "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"]
+    "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"],
+    "Recontacter": obj.templateRecontacter || DEFAULT_MESSAGE_TEMPLATES["Recontacter"]
   };
 }
 // Le Statut nomme deja l'etape EN ATTENTE (voir updateField/date1erMessage et
@@ -2890,6 +2907,8 @@ function openTemplatesModal() {
     <textarea id="tpl-r2" rows="4" style="${zoneStyle}">${escapeHtml(t["Deuxième relance"])}</textarea>
     <label style="margin-top:1rem;">Message — Reprise de contact</label>
     <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
+    <label style="margin-top:1rem;">Message — Recontacter (contact froid, 6 mois+)</label>
+    <textarea id="tpl-recontacter" rows="7" style="${zoneStyle}">${escapeHtml(t["Recontacter"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
     <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
     <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les templates.</p>
@@ -2919,6 +2938,7 @@ async function submitTemplates() {
       templatePremiereRelance: document.getElementById("tpl-r1").value,
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
       templateRepriseContact: document.getElementById("tpl-reprise").value,
+      templateRecontacter: document.getElementById("tpl-recontacter").value,
       templateRappel: document.getElementById("tpl-rappel").value
     });
   } catch (e) {
@@ -3246,6 +3266,7 @@ function preparerActionEnvoi(p) {
 }
 function urgencePourActions(p) {
   if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
+  if (p.statut === "Recontacter") return parseFrDate(p.dateRappel) || today0();
   const r = nextRelance(p);
   if (r) return parseFrDate(r);
   return today0(); // Reprise de contact jamais envoyee : pas de date naturelle
@@ -3270,6 +3291,15 @@ function rafaleActionsCandidats() {
       return !!(r && isOverdue(r));
     }
     if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
+    // "Recontacter" : contact froid (6 mois+) dont le rappel echelonne est
+    // depasse -- deja signale par le popup quotidien (maybeShowReminderPopup,
+    // groupe "recontacts") mais jusqu'ici absent de Rafale : actions, aucun
+    // outil pour vraiment le traiter. Ajoute le 21/08 suite au signalement
+    // de Marie ("44 personnes" dans le popup, 0 dans Rafale). Carte d'envoi
+    // standard (template "Recontacter", voir messageTemplatesActuels) avec
+    // en plus les boutons Pas maintenant/Hors cible deja presents sur toute
+    // carte d'envoi -- voir renderRafaleActionCard.
+    if (p.statut === "Recontacter" && p.dateRappel && isOverdue(p.dateRappel)) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 }
@@ -3328,13 +3358,22 @@ function renderRafaleActionCard() {
     // ici echouerait silencieusement, le focus ayant deja quitte cet onglet
     // depuis l'ouverture du profil.
     const cle = templateKeyPourEnvoi(p);
+    // Legende du bloc de reclassement rapide adaptee au contexte : pour un
+    // "Recontacter" (contact froid, jamais de vrai echange), "a deja
+    // repondu" n'a pas de sens -- Marie a demande le 21/08 que ces 3
+    // boutons restent disponibles ici aussi, juste avec un intitule qui
+    // correspond (reclasser sans forcement envoyer, plutot que "corriger
+    // une fiche en retard").
+    const legendeReclassement = p.statut === "Recontacter"
+      ? "Reclasser directement, sans envoyer :"
+      : "La personne a déjà répondu (fiche pas à jour) :";
     document.getElementById("rafale-content").innerHTML = `
       ${rafaleEnTeteHtml(p, total)}
       <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
       <div class="modal-actions" style="justify-content:flex-start;">
         <button class="btn" onclick="rafaleActionsEnvoyerSuivant()">Envoyé → suivant (Entrée)</button>
       </div>
-      <p class="muted" style="margin-top:1rem;margin-bottom:0.35rem;">La personne a déjà répondu (fiche pas à jour) :</p>
+      <p class="muted" style="margin-top:1rem;margin-bottom:0.35rem;">${escapeHtml(legendeReclassement)}</p>
       <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
         <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('En conversation')">En conversation</button>
         <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('Pas maintenant')">Pas maintenant</button>
@@ -3365,6 +3404,17 @@ async function rafaleActionsEnvoyerSuivant() {
     // ca sert aussi de marqueur "deja envoye" pour ne plus le re-proposer ici
     // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
     ok = await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
+  } else if (p.statut === "Recontacter") {
+    // Contrairement a Nouveau/Reprise de contact/relances, "Recontacter" n'a
+    // pas de notion de "prochaine etape du pipeline" -- c'est un cycle qui se
+    // repete tant que Marie n'a pas reclasse la personne autrement (Pas
+    // maintenant/Hors cible/En conversation, voir les boutons juste au-dessus).
+    // Repousse simplement le prochain rappel de 30 jours plutot que de laisser
+    // la date depassee (qui la ferait ressortir des demain dans Rafale :
+    // actions ET le popup quotidien). Ajoute le 21/08.
+    const dans30j = new Date(today0().getTime());
+    dans30j.setDate(dans30j.getDate() + 30);
+    ok = await updateField(p.ligne, "dateRappel", dateToIso(dans30j));
   } else {
     ok = await marquerRelanceEnvoyee(p.ligne);
   }
