@@ -111,6 +111,16 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .tplab-col .stat__value { font-size: 21px; }
 .tplab-col .stat__label { font-size: 9px; margin-top: 0.3rem; }
 .stats--compact .stat__label { font-size: 9px; margin-top: 0.3rem; }
+/* Indicateur de tendance vs semaine derniere (fleche + %) -- tres discret,
+   quasi pas de hauteur ajoutee, place sous le label. */
+.stat__trend { font-size: 9px; margin-top: 2px; letter-spacing: 0.02em; }
+.stat__trend--up { color: var(--success); }
+.stat__trend--down { color: var(--bordeaux); }
+.stat__trend--flat { color: var(--text-muted); }
+/* Variante resserree pour la ligne "Envoyes cette semaine" (4 tuiles avec
+   trend en dessous) -- pour que tout reste sur une seule ligne, demande de
+   Marie le 27/08. N'affecte pas les autres usages de .stats--compact. */
+.stats--compact.stats--tight .stat { padding: 0.7rem 0.85rem; min-width: 92px; }
 
 .section { margin-bottom: 3.5rem; }
 .section__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.5px solid var(--border); }
@@ -622,7 +632,7 @@ function isoDateToFr(str) {
 // Champs "date" (input type=date, valeur brute ISO) -- necessaire pour convertir
 // en francais avant mise a jour optimiste de currentData (le reste de l'appli
 // attend systematiquement du JJ/MM/AAAA, jamais de l'ISO).
-const CHAMPS_DATE = ["dateAppelDecouverte", "dateRappel", "date1erMessage", "date", "finAccompagnement", "date1erVersement"];
+const CHAMPS_DATE = ["dateAppelDecouverte", "dateRappel", "date1erMessage", "date", "finAccompagnement", "date1erVersement", "dateEnvoiRecontacte"];
 function coerceValeurLocale(champ, valeur) {
   if (champ === "echecPaiement" || champ === "noShowAppelDecouverte") return valeur === "true";
   if (CHAMPS_DATE.indexOf(champ) !== -1) return isoDateToFr(valeur);
@@ -742,7 +752,14 @@ const DECISION_CONFIG = {
   // vrai suivi date plutot qu'un simple archivage. dateChamp = dateReponse,
   // deja tamponnee automatiquement des le passage en "En conversation" (voir
   // Code.gs, marquerReponseRecueDepuisReconciliation et STATUTS_REPONSE).
-  "En conversation": { dateChamp: "dateReponse", delaiJours: 7, boutons: ["Pas maintenant", "Recontacter", "Hors cible"], libelle: j => `À revérifier (${j}j en conversation)` }
+  "En conversation": { dateChamp: "dateReponse", delaiJours: 7, boutons: ["Pas maintenant", "Recontacter", "Hors cible"], libelle: j => `À revérifier (${j}j en conversation)` },
+  // Ajoute le 26/08 a la demande de Marie : le message "Recontacter" ne doit
+  // plus disparaitre 30 jours sans laisser de trace (voir
+  // rafaleActionsEnvoyerSuivant) -- des l'envoi, dateEnvoiRecontacte est
+  // tamponnee, et la fiche remonte "a decider" au bout de 7 jours si elle n'a
+  // pas ete reclassee entre-temps (meme delai que Deuxieme relance/Reprise de
+  // contact, pour rester coherent).
+  "Recontacter": { dateChamp: "dateEnvoiRecontacte", delaiJours: 7, boutons: ["En conversation", "Pas maintenant", "Hors cible"], libelle: j => `À décider (message de recontact envoyé il y a ${j}j)` }
 };
 function joursEcoules(dateStr) {
   const d = parseFrDate(dateStr);
@@ -1135,6 +1152,16 @@ async function marquerRelanceEnvoyee(ligne) {
 // Classement en un clic depuis le tag "À décider" (J+7 sans réponse sur
 // Deuxième relance / Reprise de contact) -- voir estADecider().
 async function classerProspect(ligne, nouveauStatut) {
+  // Repasser en "Recontacter" (depuis "En conversation" par ex.) doit
+  // redemarrer un cycle propre : sans ca, un dateEnvoiRecontacte laisse par
+  // un ancien passage en Recontacter ferait remonter "a decider" avec une
+  // date perimee, sans qu'aucun nouveau message n'ait ete envoye entre-temps.
+  if (nouveauStatut === "Recontacter") {
+    const p = currentData.prospects.find(x => x.ligne === ligne);
+    if (p && p.dateEnvoiRecontacte) {
+      if (!(await updateField(ligne, "dateEnvoiRecontacte", ""))) return false;
+    }
+  }
   return await updateField(ligne, "statut", nouveauStatut);
 }
 function copierRappel(nom) {
@@ -1718,7 +1745,11 @@ function renderProspectsTable(prospects) {
   if (prospects.length === 0) return `<div class="empty-msg">${rechercheTexte.trim() ? "Aucun prospect ne correspond à cette recherche." : "Aucun prospect pour le moment."}</div>`;
   const rows = prospects.map(p => {
     let prochaineActionHtml;
-    if (p.statut === "Recontacter" || p.statut === "Pas maintenant") {
+    if (p.statut === "Pas maintenant" || (p.statut === "Recontacter" && !p.dateEnvoiRecontacte)) {
+      // Une fois le message de recontact envoye (dateEnvoiRecontacte
+      // renseignee), "Recontacter" bascule dans la branche DECISION_CONFIG
+      // ci-dessous -- cette date-ci ne sert plus qu'a l'echeance
+      // "pas encore envoye" (dateRappel).
       const overdue = p.dateRappel && isOverdue(p.dateRappel);
       prochaineActionHtml = `<input class="note-input ${overdue ? "next-action--overdue" : ""}" type="date" value="${frDateToIso(p.dateRappel)}" data-action="update-field" data-champ="dateRappel">`;
     } else if (p.statut === "Première relance" || (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2)) {
@@ -2094,6 +2125,14 @@ function compterDepuisDate(items, champ, seuil) {
     return d && d >= seuil;
   }).length;
 }
+// Meme principe que compterDepuisDate, borne aussi en haut (utilise pour
+// comparer "cette semaine" a "la semaine derniere complete").
+function compterEntreDates(items, champ, debutInclusif, finExclusive) {
+  return items.filter(x => {
+    const d = parseFrDate(x[champ]);
+    return d && d >= debutInclusif && d < finExclusive;
+  }).length;
+}
 
 function statsFunnelData(prospects) {
   const contactes = prospects.filter(p => {
@@ -2131,6 +2170,53 @@ function tauxAvecEffectif(numerateur, denominateur) {
   if (!denominateur) return `<span class="muted">— (n=0)</span>`;
   const pct = Math.round((numerateur / denominateur) * 100);
   return `${pct}% <span class="muted">(${numerateur}/${denominateur})</span>`;
+}
+
+// Petite fleche + % de variation sous une tuile de chiffre (onglet Stats,
+// demande de Marie le 27/08). "avant" peut etre null (indeterminable, ex.
+// ratio 0/0) -- dans ce cas on n'affiche rien plutot qu'un chiffre trompeur.
+function statTrendHtml(actuel, avant) {
+  if (actuel === null || actuel === undefined || avant === null || avant === undefined) return "";
+  if (avant === 0) {
+    if (actuel === 0) return "";
+    return `<div class="stat__trend stat__trend--up">↑</div>`;
+  }
+  const pct = Math.round(((actuel - avant) / avant) * 100);
+  if (pct === 0) return `<div class="stat__trend stat__trend--flat">→</div>`;
+  const cls = pct > 0 ? "up" : "down";
+  const fleche = pct > 0 ? "↑" : "↓";
+  return `<div class="stat__trend stat__trend--${cls}">${fleche} ${Math.abs(pct)}%</div>`;
+}
+
+// Reconstitue nContactes/nRepondus "tels qu'ils etaient" a une date donnee, a
+// partir des dates deja enregistrees par prospect (pas d'instantane stocke a
+// part) -- sert au calcul de tendance "vs il y a 7 jours" des KPI cumules.
+// Approximation assumee : les fiches sans date1erMessage mais deja comptees
+// "contactees" aujourd'hui via un signal de secours (nbRelances/statut, cas
+// d'import historique sans date) sont considerees comme deja contactees
+// "avant" aussi -- evite de gonfler artificiellement la progression affichee
+// a cause d'un simple trou de saisie plutot que d'une vraie action recente.
+function statsFunnelDataAsOf(prospects, cutoff) {
+  const contactes = prospects.filter(p => {
+    const nbr = Number(p.nbRelances) || 0;
+    if (p.date1erMessage) return parseFrDate(p.date1erMessage) <= cutoff;
+    return nbr > 0 || STATUTS_REPONSE_POSITIVE.indexOf(p.statut) !== -1 || p.statut === "Deuxième relance";
+  });
+  const repondus = contactes.filter(p => p.dateReponse && parseFrDate(p.dateReponse) <= cutoff);
+  return { nContactes: contactes.length, nRepondus: repondus.length };
+}
+// Meme principe que statsFunnelDataAsOf, pour le nombre d'appels decouverte
+// "tels qu'ils etaient" a une date donnee (prospects + clients).
+function appelsCountAsOf(prospects, clients, cutoff) {
+  const n1 = prospects.filter(p => p.dateAppelDecouverte && parseFrDate(p.dateAppelDecouverte) <= cutoff).length;
+  const n2 = clients.filter(c => c.dateAppelDecouverte && parseFrDate(c.dateAppelDecouverte) <= cutoff).length;
+  return n1 + n2;
+}
+// Prospects en base "tels qu'ils etaient" a une date donnee. Les fiches sans
+// dateAjout (import ancien, avant l'ajout de ce champ) sont considerees comme
+// deja presentes "avant" -- meme logique de precaution que statsFunnelDataAsOf.
+function prospectsEnBaseAsOf(prospects, cutoff) {
+  return prospects.filter(p => !p.dateAjout || parseFrDate(p.dateAjout) <= cutoff).length;
 }
 
 function appelsDecouverteListe(prospects, clients) {
@@ -2381,10 +2467,30 @@ function renderStatsSection(data) {
   const relance1Mois = compterDepuisDate(prospects, "dateEnvoiPremiereRelance", debutM);
   const relance2Semaine = compterDepuisDate(prospects, "dateEntreeStatutRelance", debutSem);
   const relance2Mois = compterDepuisDate(prospects, "dateEntreeStatutRelance", debutM);
+  const recontactSemaine = compterDepuisDate(prospects, "dateEnvoiRecontacte", debutSem);
   const appelSemaine = compterDepuisDate(appelsListe, "date", debutSem);
   const appelMois = compterDepuisDate(appelsListe, "date", debutM);
   const clientSemaine = compterDepuisDate(clients, "date", debutSem);
   const clientMois = compterDepuisDate(clients, "date", debutM);
+
+  // Tendances vs semaine derniere (fleche + %, demande de Marie le 27/08).
+  // Ligne "Envoyes cette semaine" : semaine derniere complete (lundi->dimanche),
+  // comparee au meme decompte que ci-dessus.
+  const debutSemDerniere = new Date(debutSem.getTime());
+  debutSemDerniere.setDate(debutSemDerniere.getDate() - 7);
+  const contactesSemaineDerniere = compterEntreDates(prospects, "date1erMessage", debutSemDerniere, debutSem);
+  const relance1SemaineDerniere = compterEntreDates(prospects, "dateEnvoiPremiereRelance", debutSemDerniere, debutSem);
+  const relance2SemaineDerniere = compterEntreDates(prospects, "dateEntreeStatutRelance", debutSemDerniere, debutSem);
+  const recontactSemaineDerniere = compterEntreDates(prospects, "dateEnvoiRecontacte", debutSemDerniere, debutSem);
+
+  // KPI principaux : "avant" = valeur reconstituee il y a 7 jours (pas une
+  // semaine calendaire ici, ce sont des totaux cumules, pas des compteurs
+  // hebdo -- voir docs/superpowers/specs/2026-08-27-tendance-stats-design.md).
+  const il7j = new Date(today0().getTime());
+  il7j.setDate(il7j.getDate() - 7);
+  const funnelAvant = statsFunnelDataAsOf(prospects, il7j);
+  const appelsAvant = appelsCountAsOf(prospects, clients, il7j);
+  const prospectsEnBaseAvant = prospectsEnBaseAsOf(prospects, il7j);
 
   const tauxReponseInfosCalculees = tauxReponseInfos([
     {
@@ -2413,22 +2519,27 @@ function renderStatsSection(data) {
     }
   ]);
 
+  // Ratio en % ou null si effectif nul (voir statTrendHtml -- pas de tendance
+  // affichee sur un ratio indeterminable).
+  const ratioPct = (num, den) => den ? (num / den) * 100 : null;
+
   return `
     <div class="stats stats--compact">
-      <div class="stat"><div class="stat__value">${prospects.length}</div><div class="stat__label">Prospects en base</div></div>
-      <div class="stat"><div class="stat__value">${funnel.nContactes}</div><div class="stat__label">Contactés (≥1 message)</div></div>
-      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div><div class="stat__label">Taux de réponse global</div></div>
-      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(appelsListe.length, funnel.nRepondus)}</div><div class="stat__label">Réponses → appel</div></div>
-      <div class="stat"><div class="stat__value">${tauxAvecEffectif(appelsListe.length, funnel.nContactes)}</div><div class="stat__label">Appels réservés / contactés</div></div>
+      <div class="stat"><div class="stat__value">${prospects.length}</div><div class="stat__label">Prospects en base</div>${statTrendHtml(prospects.length, prospectsEnBaseAvant)}</div>
+      <div class="stat"><div class="stat__value">${funnel.nContactes}</div><div class="stat__label">Contactés (≥1 message)</div>${statTrendHtml(funnel.nContactes, funnelAvant.nContactes)}</div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div><div class="stat__label">Taux de réponse global</div>${statTrendHtml(ratioPct(funnel.nRepondus, funnel.nContactes), ratioPct(funnelAvant.nRepondus, funnelAvant.nContactes))}</div>
+      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(appelsListe.length, funnel.nRepondus)}</div><div class="stat__label">Réponses → appel</div>${statTrendHtml(ratioPct(appelsListe.length, funnel.nRepondus), ratioPct(appelsAvant, funnelAvant.nRepondus))}</div>
+      <div class="stat"><div class="stat__value">${tauxAvecEffectif(appelsListe.length, funnel.nContactes)}</div><div class="stat__label">Appels réservés / contactés</div>${statTrendHtml(ratioPct(appelsListe.length, funnel.nContactes), ratioPct(appelsAvant, funnelAvant.nContactes))}</div>
     </div>
 
     <div class="viz-row" style="align-items:flex-start;">
       <div>
         <p class="muted" style="margin-bottom:0.6rem;">Envoyés cette semaine :</p>
-        <div class="stats stats--compact">
-          <div class="stat"><div class="stat__value">${contactesSemaine}</div><div class="stat__label">1ers messages</div></div>
-          <div class="stat"><div class="stat__value">${relance1Semaine}</div><div class="stat__label">Relances 1</div></div>
-          <div class="stat"><div class="stat__value">${relance2Semaine}</div><div class="stat__label">Relances 2</div></div>
+        <div class="stats stats--compact stats--tight">
+          <div class="stat"><div class="stat__value">${contactesSemaine}</div><div class="stat__label">1ers messages</div>${statTrendHtml(contactesSemaine, contactesSemaineDerniere)}</div>
+          <div class="stat"><div class="stat__value">${relance1Semaine}</div><div class="stat__label">Relances 1</div>${statTrendHtml(relance1Semaine, relance1SemaineDerniere)}</div>
+          <div class="stat"><div class="stat__value">${relance2Semaine}</div><div class="stat__label">Relances 2</div>${statTrendHtml(relance2Semaine, relance2SemaineDerniere)}</div>
+          <div class="stat"><div class="stat__value">${recontactSemaine}</div><div class="stat__label">Recontacts</div>${statTrendHtml(recontactSemaine, recontactSemaineDerniere)}</div>
         </div>
       </div>
       <div>
@@ -2724,7 +2835,12 @@ function openHistoriqueModal(ligne) {
   // Code.gs), pas un vrai evenement de conversation. On ne l'affiche que
   // quand il y a eu au moins une relance (l'historique est alors plus
   // riche qu'un simple "jamais repondu").
-  if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel
+  if (p.dateEnvoiRecontacte) {
+    // Priorite sur "A recontacter" ci-dessous : une fois le message envoye,
+    // la date qui compte est celle de l'envoi reel, pas l'echeance
+    // artificielle qui l'a declenche (voir DECISION_CONFIG["Recontacter"]).
+    evenements.push({ label: "Message de recontact envoyé", date: p.dateEnvoiRecontacte, champs: ["dateEnvoiRecontacte"] });
+  } else if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel
     && !((Number(p.nbRelances) || 0) === 0 && p.date1erMessage)) {
     evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel, champs: ["dateRappel"] });
   }
@@ -2778,6 +2894,10 @@ function openHistoriqueModal(ligne) {
     </div>
     ${listeHtml}
     <p class="muted" style="margin-top:0.5rem;">Effacer un événement corrige aussi Nb relances si besoin, pour que la fiche reste cohérente avec le statut (change le statut via le tableau si besoin).</p>
+    <label style="margin-top:1rem;">Historique complet des statuts</label>
+    <div id="historique-statuts-body" data-ligne="${ligne}" style="margin-top:0.35rem;">
+      <p class="muted">Chargement…</p>
+    </div>
     <label style="margin-top:1rem;">Note</label>
     <textarea id="m-historique-note" rows="5" style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;" placeholder="Les points importants...">${escapeHtml(p.note || "")}</textarea>
     <div class="modal-actions">
@@ -2786,6 +2906,37 @@ function openHistoriqueModal(ligne) {
     </div>
   `;
   document.getElementById("modal-overlay").hidden = false;
+  chargerHistoriqueStatutsFiche(ligne, p.lien);
+}
+// Charge le journal complet des changements de Statut (onglet
+// HistoriqueStatuts, voir Code.gs/journaliserChangementStatut) -- appel
+// reseau separe, pas bloquant pour l'ouverture de la fiche (le reste de la
+// modale s'affiche instantanement depuis currentData deja en memoire).
+// Non-await depuis openHistoriqueModal : verifie au retour que la fiche
+// affichee est toujours la meme (data-ligne) avant d'ecrire dans le DOM, au
+// cas ou Marie aurait ouvert une autre fiche entre-temps.
+async function chargerHistoriqueStatutsFiche(ligne, lien) {
+  const cible = document.getElementById("historique-statuts-body");
+  if (!cible) return;
+  if (!lien) {
+    cible.innerHTML = `<p class="muted">Pas de lien LinkedIn enregistré, historique indisponible.</p>`;
+    return;
+  }
+  let data;
+  try {
+    data = await jsonpCall({ action: "historiqueStatuts", lien });
+  } catch (err) {
+    if (document.getElementById("historique-statuts-body")?.dataset.ligne === String(ligne)) {
+      cible.innerHTML = `<p class="muted">Erreur de chargement de l'historique.</p>`;
+    }
+    return;
+  }
+  const cibleActuelle = document.getElementById("historique-statuts-body");
+  if (!cibleActuelle || cibleActuelle.dataset.ligne !== String(ligne)) return; // fiche changee entre-temps
+  const evenements = (data && data.evenements) || [];
+  cibleActuelle.innerHTML = evenements.length
+    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.nouveau)}</b> — ${escapeHtml(ev.date)}</li>`).join("")}</ul>`
+    : `<p class="muted">Aucun changement de statut enregistré depuis le 27/08/2026 (mise en place de cet historique).</p>`;
 }
 async function submitHistoriqueNote(ligne) {
   const valeur = document.getElementById("m-historique-note").value;
@@ -3299,7 +3450,7 @@ function rafaleActionsCandidats() {
     // standard (template "Recontacter", voir messageTemplatesActuels) avec
     // en plus les boutons Pas maintenant/Hors cible deja presents sur toute
     // carte d'envoi -- voir renderRafaleActionCard.
-    if (p.statut === "Recontacter" && p.dateRappel && isOverdue(p.dateRappel)) return true;
+    if (p.statut === "Recontacter" && !p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel)) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 }
@@ -3405,16 +3556,15 @@ async function rafaleActionsEnvoyerSuivant() {
     // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
     ok = await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
   } else if (p.statut === "Recontacter") {
-    // Contrairement a Nouveau/Reprise de contact/relances, "Recontacter" n'a
-    // pas de notion de "prochaine etape du pipeline" -- c'est un cycle qui se
-    // repete tant que Marie n'a pas reclasse la personne autrement (Pas
-    // maintenant/Hors cible/En conversation, voir les boutons juste au-dessus).
-    // Repousse simplement le prochain rappel de 30 jours plutot que de laisser
-    // la date depassee (qui la ferait ressortir des demain dans Rafale :
-    // actions ET le popup quotidien). Ajoute le 21/08.
-    const dans30j = new Date(today0().getTime());
-    dans30j.setDate(dans30j.getDate() + 30);
-    ok = await updateField(p.ligne, "dateRappel", dateToIso(dans30j));
+    // Revu le 26/08 : l'ancien comportement (repousser dateRappel de 30 jours
+    // "silencieusement") laissait la personne sans suivi si Marie n'avait pas
+    // de reponse -- elle a demande qu'un message envoye soit systematiquement
+    // suivi d'un classement, pas oublie. dateEnvoiRecontacte tamponne la date
+    // reelle d'envoi ; DECISION_CONFIG["Recontacter"] la fait remonter "a
+    // decider" au bout de 7 jours si elle n'a pas ete reclassee entre-temps
+    // (voir rafaleActionsCandidats/maybeShowReminderPopup, generiques sur
+    // estADecider). dateRappel n'est plus touchee ici.
+    ok = await updateField(p.ligne, "dateEnvoiRecontacte", dateToIso(new Date()));
   } else {
     ok = await marquerRelanceEnvoyee(p.ligne);
   }
@@ -3520,7 +3670,7 @@ function maybeShowReminderPopup(data) {
   for (const p of data.prospects) {
     const r = nextRelance(p);
     if (r && isOverdue(r)) relances.push(p);
-    else if (p.dateRappel && isOverdue(p.dateRappel)) recontacts.push(p);
+    else if (!p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel)) recontacts.push(p);
     if (p.statut === "En attente de connexion" && p.dateAttenteConnexion) {
       const d = parseFrDate(p.dateAttenteConnexion);
       if (d && Math.round((today0() - d) / 86400000) >= 21) connexionsAPurger.push(p);
