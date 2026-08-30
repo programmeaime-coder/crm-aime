@@ -1161,6 +1161,14 @@ async function classerProspect(ligne, nouveauStatut) {
     if (p && p.dateEnvoiRecontacte) {
       if (!(await updateField(ligne, "dateEnvoiRecontacte", ""))) return false;
     }
+    // Pose une dateRappel a +2 mois -- demande de Marie le 30/08 : sans ca,
+    // une fiche reclassee "Recontacter" via ce bouton (contrairement au scan
+    // de reconciliation, qui pose deja sa propre dateRappel echelonnee
+    // automatiquement) n'avait aucune echeance et ne remontait jamais dans
+    // Rafale : actions (voir rafaleActionsCandidats, condition sur dateRappel).
+    const dans2Mois = new Date(today0().getTime());
+    dans2Mois.setMonth(dans2Mois.getMonth() + 2);
+    if (!(await updateField(ligne, "dateRappel", dateToIso(dans2Mois)))) return false;
   }
   return await updateField(ligne, "statut", nouveauStatut);
 }
