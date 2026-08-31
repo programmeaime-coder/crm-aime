@@ -3582,7 +3582,7 @@ function renderRafaleActionCard() {
     // une fiche en retard").
     const legendeReclassement = p.statut === "Recontacter"
       ? "Reclasser directement, sans envoyer :"
-      : "La personne a déjà répondu (fiche pas à jour) :";
+      : "La personne a déjà répondu, ou n'est pas connectée (fiche pas à jour) :";
     document.getElementById("rafale-content").innerHTML = `
       ${rafaleEnTeteHtml(p, total)}
       <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
@@ -3592,6 +3592,7 @@ function renderRafaleActionCard() {
       <p class="muted" style="margin-top:1rem;margin-bottom:0.35rem;">${escapeHtml(legendeReclassement)}</p>
       <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
         <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('En conversation')">En conversation</button>
+        <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('En attente de connexion')">En attente de connexion</button>
         <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('Pas maintenant')">Pas maintenant</button>
         <button class="btn btn--ghost" onclick="rafaleActionsDecisionClasser('Hors cible')">Hors cible</button>
       </div>
@@ -3658,6 +3659,16 @@ async function rafaleActionsDecisionClasser(statutCible) {
     openConvertModal(p.ligne, p.nom);
     return;
   }
+  // Meme regle que rafaleActionsEnvoyerSuivant() (voir commentaire sur
+  // preparerActionEnvoi) : copier le message et ouvrir le profil du PROCHAIN
+  // candidat doit se faire de facon synchrone, avant tout await, sinon le
+  // presse-papier reste bloque sur le message de la personne qu'on est en
+  // train de reclasser. Bug constate en usage le 31/08/2026 : en cliquant
+  // "En conversation"/"Pas maintenant"/etc. plutot que "Envoye", la fiche
+  // suivante s'affichait bien mais son profil LinkedIn ne s'ouvrait pas et le
+  // presse-papier gardait le message (et le prenom) du contact precedent.
+  const suivant = rafaleQueue[rafaleIndex + 1];
+  preparerActionEnvoi(suivant);
   if (!(await classerProspect(p.ligne, statutCible))) return;
   rafaleIndex++;
   renderRafaleActionCard();
