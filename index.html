@@ -629,6 +629,31 @@ function isoDateToFr(str) {
   if (p.length !== 3) return "";
   return p[2] + "/" + p[1] + "/" + p[0];
 }
+// Piege recurrent du champ <input type="date"> natif de Chrome : taper
+// l'annee sur 1-3 chiffres (ex. "26" pour 2026) sans les 4 chiffres complets
+// produit une annee bidon (0026, 0006...) au lieu d'un refus -- deja
+// rencontre deux fois en donnees reelles (Henry De Traux, Theotime
+// Toussaint, voir Audit du 2026-08-19). Bloque a la saisie plutot que de
+// laisser polluer le Sheet ; anneeRaisonnable_ cote Code.gs fait le meme
+// controle en filet de securite serveur.
+function anneeDateRaisonnable(valeurIso) {
+  if (!valeurIso) return true;
+  const annee = Number(valeurIso.slice(0, 4));
+  return annee >= 2020 && annee <= 2035;
+}
+// Meme controle que les listeners delegues change/focusout, pour les champs
+// date des modales (openClientModal/openHistoriqueModal) qui appellent
+// updateField/updateClientField directement via onchange plutot que par
+// delegation d'evenement.
+function onDateFieldChange(inputEl, ligne, champ, estClient) {
+  if (!anneeDateRaisonnable(inputEl.value)) {
+    alert("Année invalide — tape les 4 chiffres de l'année (ex. 2026). Le champ a été vidé, réessaie.");
+    inputEl.value = "";
+    return;
+  }
+  if (estClient) updateClientField(ligne, champ, inputEl.value);
+  else updateField(ligne, champ, inputEl.value);
+}
 // Champs "date" (input type=date, valeur brute ISO) -- necessaire pour convertir
 // en francais avant mise a jour optimiste de currentData (le reste de l'appli
 // attend systematiquement du JJ/MM/AAAA, jamais de l'ISO).
@@ -2789,15 +2814,15 @@ function openClientModal(ligne) {
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
       <div style="flex:1;min-width:140px;">
         <label>Appel découverte</label>
-        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.dateAppelDecouverte)}" onchange="updateClientField(${ligne}, 'dateAppelDecouverte', this.value)">
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.dateAppelDecouverte)}" onchange="onDateFieldChange(this, ${ligne}, 'dateAppelDecouverte', true)">
       </div>
       <div style="flex:1;min-width:140px;">
         <label>Signature</label>
-        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.date)}" onchange="updateClientField(${ligne}, 'date', this.value)">
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.date)}" onchange="onDateFieldChange(this, ${ligne}, 'date', true)">
       </div>
       <div style="flex:1;min-width:140px;">
         <label>Fin d'accompagnement</label>
-        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.finAccompagnement)}" onchange="updateClientField(${ligne}, 'finAccompagnement', this.value)">
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(c.finAccompagnement)}" onchange="onDateFieldChange(this, ${ligne}, 'finAccompagnement', true)">
       </div>
     </div>
     <label>Commentaire</label>
@@ -2885,7 +2910,7 @@ function openHistoriqueModal(ligne) {
       </div>
       <div style="flex:1;min-width:140px;">
         <label>Appel découverte</label>
-        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" onchange="updateField(${ligne}, 'dateAppelDecouverte', this.value)">
+        <input class="note-input" style="width:100%;" type="date" value="${frDateToIso(p.dateAppelDecouverte)}" onchange="onDateFieldChange(this, ${ligne}, 'dateAppelDecouverte', false)">
         <label class="no-show-check">
           <input type="checkbox" ${p.noShowAppelDecouverte ? "checked" : ""} onchange="updateField(${ligne}, 'noShowAppelDecouverte', this.checked ? 'true' : 'false')">
           No-show
@@ -3722,6 +3747,11 @@ document.getElementById("tabs").addEventListener("click", (e) => {
 document.getElementById("app").addEventListener("change", (e) => {
   const elP = e.target.closest("[data-action='update-field']");
   if (elP) {
+    if (elP.type === "date" && !anneeDateRaisonnable(elP.value)) {
+      alert("Année invalide — tape les 4 chiffres de l'année (ex. 2026). Le champ a été vidé, réessaie.");
+      elP.value = "";
+      return;
+    }
     const ligne = Number(elP.closest("tr").dataset.ligne);
     if (elP.dataset.champ === "statut" && elP.value === "Client") {
       const nom = elP.closest("tr").querySelector(".name-cell").textContent;
@@ -3733,6 +3763,11 @@ document.getElementById("app").addEventListener("change", (e) => {
   }
   const elC = e.target.closest("[data-action='update-client-field']");
   if (elC) {
+    if (elC.type === "date" && !anneeDateRaisonnable(elC.value)) {
+      alert("Année invalide — tape les 4 chiffres de l'année (ex. 2026). Le champ a été vidé, réessaie.");
+      elC.value = "";
+      return;
+    }
     const ligne = Number(elC.closest("tr").dataset.ligne);
     updateClientField(ligne, elC.dataset.champ, elC.value);
     return;
@@ -3753,12 +3788,17 @@ document.getElementById("app").addEventListener("change", (e) => {
 document.getElementById("app").addEventListener("focusout", (e) => {
   const elP = e.target.closest("input[data-action='update-field']");
   if (elP) {
+    // Les champs date sont deja geres par l'evenement "change" ci-dessus
+    // (qui inclut le controle anneeDateRaisonnable) -- les re-traiter ici
+    // doublerait l'ecriture (et l'alerte) a chaque edition.
+    if (elP.type === "date") return;
     const ligne = Number(elP.closest("tr").dataset.ligne);
     updateField(ligne, elP.dataset.champ, elP.value);
     return;
   }
   const elC = e.target.closest("input[data-action='update-client-field']");
   if (elC) {
+    if (elC.type === "date") return;
     const ligne = Number(elC.closest("tr").dataset.ligne);
     updateClientField(ligne, elC.dataset.champ, elC.value);
   }
