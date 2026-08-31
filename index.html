@@ -1086,12 +1086,17 @@ function nomFicheHtml(p) {
 }
 function rappelsADemainHtml(prospects, obj) {
   const aujourdhui = today0();
+  // diff === 0 (appel aujourd'hui) ajouté le 31/08/2026 : un appel prévu le
+  // jour même ne tombait dans aucun des deux groupes (ni "à venir" -- filtré
+  // sur J+1/J+2 -- ni "tenu, à évaluer" -- estADecider exige j>=1 jour
+  // depuis l'appel) et restait invisible dans cette case jusqu'au lendemain.
+  // Repéré par Marie sur Guillaume Massuyeau (appel découverte du 31/08).
   const upcoming = prospects
     .filter(p => {
       const d = parseFrDate(p.dateAppelDecouverte);
       if (!d) return false;
       const diff = Math.round((d - aujourdhui) / 86400000);
-      return diff === 1 || diff === 2;
+      return diff === 0 || diff === 1 || diff === 2;
     })
     .sort((a, b) => parseFrDate(a.dateAppelDecouverte) - parseFrDate(b.dateAppelDecouverte));
   const appelADecider = prospects.filter(p => p.statut === "Appel découverte" && estADecider(p));
@@ -1107,12 +1112,16 @@ function rappelsADemainHtml(prospects, obj) {
   const groupeAppel = (upcoming.length || appelADecider.length) ? `
     <div class="rappel-groupe">
       <p class="muted" style="margin-bottom:0.4rem;"><b>Appel découverte</b></p>
-      ${upcoming.length ? `<div class="rappels-list">${upcoming.map(p => `
+      ${upcoming.length ? `<div class="rappels-list">${upcoming.map(p => {
+        const diffJ = Math.round((parseFrDate(p.dateAppelDecouverte) - aujourdhui) / 86400000);
+        const quand = diffJ === 0 ? "<b>aujourd'hui</b>" : `le ${escapeHtml(p.dateAppelDecouverte)}`;
+        return `
         <div class="rappel-item">
-          <span>${nomFicheHtml(p)} — appel découverte le ${escapeHtml(p.dateAppelDecouverte)}</span>
+          <span>${nomFicheHtml(p)} — appel découverte ${quand}</span>
           <button class="link-btn" data-action="copy-rappel" data-nom="${escapeHtml(p.nom)}">Copier message de rappel</button>
         </div>
-      `).join("")}</div>` : ""}
+      `;
+      }).join("")}</div>` : ""}
       ${appelADecider.length ? `<div class="rappels-list">${appelADecider.map(p => `
         <div class="rappel-item">
           <span>${nomFicheHtml(p)} — appel tenu, à évaluer</span>
