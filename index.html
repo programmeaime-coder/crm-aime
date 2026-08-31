@@ -3635,12 +3635,39 @@ async function rafaleActionsEnvoyerSuivant() {
   const suivant = rafaleQueue[rafaleIndex + 1];
   preparerActionEnvoi(suivant);
   let ok;
-  if (p.statut === "Nouveau" || p.statut === "Reprise de contact") {
+  if (p.statut === "Nouveau") {
+    // Bug trouve le 31/08/2026 (Marie: "les 2 dernieres captures, je n'ai pas
+    // envoye de message" -- prospects restes invisibles partout dans le CRM) :
+    // un simple updateField(date1erMessage) laissait le Statut a "Nouveau",
+    // alors que nextRelance()/rafaleActionsCandidats() exigent Statut =
+    // "Premiere relance" pour jamais proposer une Relance 1 -- meme invariant
+    // que documente dans rafaleTriEtapeValider ("le Statut nomme toujours
+    // l'etape EN ATTENTE"). Reutilise l'action combinee deja deployee pour
+    // "Rafale : trier" (updateProspectDejaContacte, ecrit date1erMessage +
+    // nbRelances + Statut en un seul appel) plutot qu'un nouveau endpoint.
+    const iso1erMessage = dateToIso(new Date());
+    let res;
+    try {
+      res = await jsonpCall({ action: "updateProspectDejaContacte", ligne: p.ligne, date1erMessage: iso1erMessage, nbRelances: "0", statut: "Première relance" });
+    } catch (err) {
+      alert("Échec de l'enregistrement (connexion). Réessaie.");
+      loadData(true);
+      ok = false;
+      res = null;
+    }
+    if (res) {
+      ok = !!res.ok;
+      if (!ok) alert("Échec de l'enregistrement : " + (res.erreur || "erreur inconnue"));
+    }
+  } else if (p.statut === "Reprise de contact") {
     // Reprise de contact : ecrit Date 1er message (jamais utilisee pour cette
     // etape sinon) plutot que de re-ecrire le Statut -- Code.gs s'en sert pour
     // tamponner la colonne Y a la date d'envoi REELLE (pas la date du tri), et
     // ca sert aussi de marqueur "deja envoye" pour ne plus le re-proposer ici
     // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
+    // Contrairement a "Nouveau" ci-dessus, son suivi J+7 (DECISION_CONFIG) se
+    // base sur dateEntreeStatutRelance, pas sur nextRelance()/Statut -- pas le
+    // meme bug, ne pas toucher au Statut ici.
     ok = await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
   } else if (p.statut === "Recontacter") {
     // Revu le 26/08 : l'ancien comportement (repousser dateRappel de 30 jours
