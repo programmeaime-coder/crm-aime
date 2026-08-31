@@ -3455,12 +3455,29 @@ function urgencePourActions(p) {
   if (r) return parseFrDate(r);
   return today0(); // Reprise de contact jamais envoyee : pas de date naturelle
 }
+// File priorisee par groupes (demande de Marie le 31/08/2026 : l'ancien tri
+// unique par urgencePourActions melangeait toutes les categories par date,
+// ce qui donnait une impression de desordre). Ordre fixe, un groupe apres
+// l'autre plutot qu'un seul tri global :
+//  1. Nouveaux prospects jamais contactes (derniers ajoutes en tete) --
+//     integre ici a la demande de Marie (avant, exclusif a "Rafale :
+//     premiers messages", qui reste disponible a part pour blitzer
+//     uniquement ce stock).
+//  2. Cartes d'envoi de la famille "relance" (Premiere/Deuxieme relance en
+//     retard, Reprise de contact jamais envoyee).
+//  3. Cartes de decision "a statuer" (En conversation, Deuxieme
+//     relance/Reprise de contact/Appel decouverte sans reponse depuis le
+//     delai defini dans DECISION_CONFIG) -- tout sauf Recontacter.
+//  4. Recontacter (jamais encore renvoye et en retard, ou renvoye et sans
+//     reponse depuis 7j).
+// Chaque groupe reste trie en interne par urgencePourActions (le plus en
+// retard en tete) ou par date d'ajout pour les nouveaux -- seule la logique
+// deja existante et testee, juste regroupee.
 function rafaleActionsCandidats() {
-  // "Nouveau" (premier message jamais envoye) est volontairement exclu : c'est
-  // le stock temporaire des ~2300 abonnes a rattraper, traite a part par
-  // "Rafale : premiers messages" (onglet Prospects). Rafale : actions ne
-  // couvre que ce qui reviendra en continu une fois ce stock ecoule.
-  //
+  const nouveaux = currentData.prospects
+    .filter(p => p.statut === "Nouveau" && !p.date1erMessage)
+    .sort(comparerDateAjoutDesc);
+
   // Bug corrige le 18/08/2026 : "Première relance"/"Deuxième relance" etaient
   // inclus des l'entree dans ce statut (des l'enregistrement de Date 1er
   // message, voir updateField), sans jamais verifier que le delai J+5/J+7 est
@@ -3468,24 +3485,30 @@ function rafaleActionsCandidats() {
   // sa relance des le lendemain. relancesADemainHtml() faisait deja ce
   // controle correctement (isOverdue(nextRelance(p))) ; rafaleActionsCandidats
   // ne le faisait pas. Repris ici pour rester coherent.
-  return currentData.prospects.filter(p => {
-    if (estADecider(p)) return true;
+  const enEnvoi = currentData.prospects.filter(p => {
     if (p.statut === "Première relance" || (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2)) {
       const r = nextRelance(p);
       return !!(r && isOverdue(r));
     }
     if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
-    // "Recontacter" : contact froid (6 mois+) dont le rappel echelonne est
-    // depasse -- deja signale par le popup quotidien (maybeShowReminderPopup,
-    // groupe "recontacts") mais jusqu'ici absent de Rafale : actions, aucun
-    // outil pour vraiment le traiter. Ajoute le 21/08 suite au signalement
-    // de Marie ("44 personnes" dans le popup, 0 dans Rafale). Carte d'envoi
-    // standard (template "Recontacter", voir messageTemplatesActuels) avec
-    // en plus les boutons Pas maintenant/Hors cible deja presents sur toute
-    // carte d'envoi -- voir renderRafaleActionCard.
-    if (p.statut === "Recontacter" && !p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel)) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+
+  const aStatuer = currentData.prospects
+    .filter(p => p.statut !== "Recontacter" && estADecider(p))
+    .sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+
+  // "Recontacter" : contact froid (6 mois+) dont le rappel echelonne est
+  // depasse (jamais encore renvoye), ou dont le message de recontact a ete
+  // envoye mais reste sans reponse depuis 7j (estADecider) -- deux stades du
+  // meme statut, regroupes ici comme demande par Marie.
+  const aRecontacter = currentData.prospects.filter(p => {
+    if (p.statut !== "Recontacter") return false;
+    if (estADecider(p)) return true;
+    return !p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel);
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+
+  return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter];
 }
 function ouvrirRafalePremiersMessages() {
   rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).slice().sort(comparerDateAjoutDesc);
