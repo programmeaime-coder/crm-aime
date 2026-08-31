@@ -1149,23 +1149,55 @@ function rappelsADemainHtml(prospects, obj) {
 
   return groupeAppel + groupeReprise + groupeDeuxieme;
 }
-// Simple aperçu (pas d'action ici) -- Marie traite les relances depuis
-// l'onglet Prospects, ou le lien profil et le tri sont deja sous les yeux.
+// Recap par categories (nombres, pas de noms) -- demande de Marie le
+// 31/08/2026 : l'ancienne version (liste de prenoms limitee a Relance 1/2 en
+// retard) ne montrait que 10 personnes alors que le popup quotidien
+// (maybeShowReminderPopup, meme jour) en annonce ~200 -- decompte trop etroit
+// pour donner une vue fiable de ce qu'il reste a traiter. Categories choisies
+// pour couvrir tout ce que "Rafale : actions" (rafaleActionsCandidats) traite
+// et qui n'est pas deja visible avec les noms dans l'encart "Rappels" a cote
+// (Appel decouverte / Reprise J+7 / Deuxieme relance J+7 restent la-bas, pas
+// dupliques ici).
 function relancesADemainHtml(prospects) {
-  const matches = prospects.filter(p => {
+  const premierMessage = prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).length;
+
+  const relance1 = prospects.filter(p => {
+    if ((Number(p.nbRelances) || 0) !== 0) return false;
     const r = nextRelance(p);
-    return r && isOverdue(r);
-  });
-  if (!matches.length) return `<p class="muted">Aucune relance en retard.</p>`;
-  const premiere = matches.filter(p => (Number(p.nbRelances) || 0) === 0);
-  const deuxieme = matches.filter(p => (Number(p.nbRelances) || 0) === 1);
-  const ligneRelance = (label, liste) => liste.length
-    ? `<div>• ${label} : ${liste.map(p => escapeHtml(p.nom)).join(", ")}.</div>`
-    : "";
+    return !!(r && isOverdue(r));
+  }).length;
+
+  const relance2 = prospects.filter(p => {
+    if ((Number(p.nbRelances) || 0) !== 1) return false;
+    const r = nextRelance(p);
+    return !!(r && isOverdue(r));
+  }).length;
+
+  const repriseAEnvoyer = prospects.filter(p => p.statut === "Reprise de contact" && !p.date1erMessage).length;
+
+  const enConversation = prospects.filter(p => p.statut === "En conversation" && estADecider(p)).length;
+
+  const aRecontacter = prospects.filter(p => {
+    if (p.statut !== "Recontacter") return false;
+    if (estADecider(p)) return true;
+    return !!(!p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel));
+  }).length;
+
+  const lignes = [
+    ["premier message à envoyer", premierMessage],
+    ["relance 1 à envoyer", relance1],
+    ["relance 2 à envoyer", relance2],
+    ["reprise de contact à envoyer", repriseAEnvoyer],
+    ["en conversation à statuer", enConversation],
+    ["à recontacter", aRecontacter],
+  ].filter(([, n]) => n > 0);
+
+  const total = lignes.reduce((sum, [, n]) => sum + n, 0);
+  if (!total) return `<p class="muted">Rien à traiter pour l'instant.</p>`;
+
   return `<div class="rappel-item rappel-item--block">
-    <div><b>${matches.length} relance${matches.length > 1 ? "s" : ""} aujourd'hui</b></div>
-    ${ligneRelance("Première relance", premiere)}
-    ${ligneRelance("Deuxième relance", deuxieme)}
+    <div><b>${total} action${total > 1 ? "s" : ""} à traiter</b></div>
+    ${lignes.map(([label, n]) => `<div>• ${n} ${escapeHtml(label)}</div>`).join("")}
   </div>`;
 }
 // Fait avancer Nb relances ET Statut ensemble, pour que les deux restent
@@ -1505,8 +1537,8 @@ function renderDashboard(data) {
       </div>
       <div class="rappels-relances-grid">
         <div class="rappels-relances-box rappels-relances-box--relances">
-          <div class="rappels-relances-box__titre">Relances</div>
-          <p class="muted" style="margin-bottom:0.75rem;">Prospects dont la Relance 1 ou 2 est dépassée.</p>
+          <div class="rappels-relances-box__titre">À traiter</div>
+          <p class="muted" style="margin-bottom:0.75rem;">Récap par catégorie de ce qui attend une action (détail dans Rafale : actions).</p>
           ${relancesADemainHtml(data.prospects)}
         </div>
         <div class="rappels-relances-box rappels-relances-box--rappels">
