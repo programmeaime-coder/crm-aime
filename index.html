@@ -1522,7 +1522,10 @@ function renderDashboard(data) {
     <div class="section">
       <div class="section__head">
         <span class="section__eyebrow">Rappels & Relances</span>
-        <button class="btn" onclick="ouvrirRafaleActions()">Rafale : actions</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn" onclick="ouvrirRafaleActions()">Rafale : actions</button>
+          <button class="btn btn--ghost" onclick="ouvrirRafaleConnexions()">Rafale : demandes de connexion</button>
+        </div>
       </div>
       <div class="rappels-relances-grid">
         <div class="rappels-relances-box rappels-relances-box--relances">
@@ -1794,7 +1797,6 @@ function renderProspectsSection(prospects) {
         </div>
         <div class="toolbar__row toolbar__row--actions">
           <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
-          <button class="btn btn--ghost" onclick="ouvrirRafalePremiersMessages()">Rafale : premiers messages</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
           <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
         </div>
@@ -2997,9 +2999,67 @@ async function chargerHistoriqueStatutsFiche(ligne, lien) {
   const cibleActuelle = document.getElementById("historique-statuts-body");
   if (!cibleActuelle || cibleActuelle.dataset.ligne !== String(ligne)) return; // fiche changee entre-temps
   const evenements = (data && data.evenements) || [];
+  // Boutons "Effacer"/"Enregistrer" SANS onclick interpole (nouveau/lien
+  // viennent au final d'un parametre de requete journalise tel quel cote
+  // serveur, voir journaliserChangementStatut/e.parameter.valeur -- eviter
+  // d'injecter ces valeurs dans une chaine JS, meme echappees a la main) --
+  // data-* + de vrais listeners attaches apres coup, valeurs jamais
+  // interpretees comme du code.
   cibleActuelle.innerHTML = evenements.length
-    ? `<ul class="rappels-list">${evenements.map(ev => `<li><b>${escapeHtml(ev.nouveau)}</b> — ${escapeHtml(ev.date)}</li>`).join("")}</ul>`
+    ? `<ul class="rappels-list">${evenements.map(ev => `
+      <li style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+        <span><b>${escapeHtml(ev.nouveau)}</b> — ${escapeHtml(ev.date)}</span>
+        <input type="date" class="note-input js-modifier-hist-date" data-hist="${escapeHtml(String(ev.ligneHist))}" value="${escapeHtml(String(ev.dateIso || ""))}" style="width:auto;">
+        <button class="link-btn js-modifier-hist" data-hist="${escapeHtml(String(ev.ligneHist))}">Enregistrer</button>
+        <button class="link-btn js-effacer-hist" data-hist="${escapeHtml(String(ev.ligneHist))}" data-label="${escapeHtml(String(ev.nouveau))}">Effacer</button>
+      </li>`).join("")}</ul>`
     : `<p class="muted">Aucun changement de statut enregistré depuis le 27/08/2026 (mise en place de cet historique).</p>`;
+  cibleActuelle.querySelectorAll(".js-effacer-hist").forEach(btn => {
+    btn.addEventListener("click", () => effacerHistoriqueStatutLigne(ligne, lien, Number(btn.dataset.hist), btn.dataset.label));
+  });
+  cibleActuelle.querySelectorAll(".js-modifier-hist").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const input = cibleActuelle.querySelector(`.js-modifier-hist-date[data-hist="${btn.dataset.hist}"]`);
+      modifierHistoriqueStatutDate(ligne, lien, Number(btn.dataset.hist), input ? input.value : "");
+    });
+  });
+}
+// Efface une entree du journal HistoriqueStatuts (demande de Marie le
+// 02/09/2026 : le backfill du 27/08 a parfois ecrit la meme date pour
+// plusieurs statuts d'un meme prospect -- ex. "Nouveau", "Première relance"
+// et "Appel découverte" tous a 03/08/2026 -- sans moyen de nettoyer une
+// entree incoherente, contrairement aux evenements de la fiche principale
+// (effacerEvenementFiche). Cible par lien LinkedIn + numero de ligne reel
+// dans l'onglet (voir Code.gs/effacerHistoriqueStatutLigne) ; recharge la
+// liste au lieu de retirer l'entree localement, pour rester coherent si les
+// numeros de ligne ont bouge entre-temps.
+async function effacerHistoriqueStatutLigne(ligne, lien, ligneHist, label) {
+  if (!confirm(`Effacer l'entrée "${label}" de l'historique des statuts ?`)) return;
+  let res;
+  try {
+    res = await jsonpCall({ action: "effacerHistoriqueStatut", lien, ligneHist });
+  } catch (err) {
+    alert("Échec de la suppression (connexion). Réessaie.");
+    return;
+  }
+  if (!res || !res.ok) { alert("Échec de la suppression : " + (res && res.erreur || "erreur inconnue")); return; }
+  chargerHistoriqueStatutsFiche(ligne, lien);
+}
+// Corrige la date d'une entree du journal HistoriqueStatuts sans l'effacer
+// (demande de Marie le 02/09/2026, en complement d'"Effacer" ci-dessus) --
+// utile pour les entrees backfillees dont elle connait ou peut retrouver la
+// vraie date, voir Code.gs/modifierHistoriqueStatutDate.
+async function modifierHistoriqueStatutDate(ligne, lien, ligneHist, dateIso) {
+  if (!dateIso) { alert("Choisis une date."); return; }
+  let res;
+  try {
+    res = await jsonpCall({ action: "modifierHistoriqueStatutDate", lien, ligneHist, date: dateIso });
+  } catch (err) {
+    alert("Échec de l'enregistrement (connexion). Réessaie.");
+    return;
+  }
+  if (!res || !res.ok) { alert("Échec de l'enregistrement : " + (res && res.erreur || "erreur inconnue")); return; }
+  chargerHistoriqueStatutsFiche(ligne, lien);
 }
 async function submitHistoriqueNote(ligne) {
   const valeur = document.getElementById("m-historique-note").value;
@@ -3235,20 +3295,32 @@ async function submitAddClient() {
 }
 
 // ─── Mode rafale (traitement en serie sur les ~2500 abonnes) ───
-// Trois ecrans distincts (voir discussion avec Marie). Deux temporaires, le
-// temps d'ecouler le stock de prospects "Nouveau" jamais catalogues, tous les
-// deux dans l'onglet Prospects : la Rafale "trier" classe rapidement les
-// ambigus (jamais contactes vs. deja contactes il y a des mois, avant que ce
-// suivi existe) sans jamais envoyer de message ; la Rafale "premiers
-// messages" envoie ensuite le tout premier message aux "Nouveau" tries.
-// Le troisieme, "Rafale : actions" (tableau de bord), est permanent : il
-// traite tout ce qui revient en continu une fois le stock ecoule -- envoi des
-// relances/reprises en attente ET decisions J+7/J+1 -- en une seule file
-// triee par urgence, chaque carte adaptee a son type. Les trois partagent le
-// meme mecanisme de carte (rafaleMode "actions"), seule la file differe.
-let rafaleMode = null; // "tri" | "actions"
+// "Rafale : premiers messages" a existe puis a ete supprimee le 02/09/2026
+// (demande de Marie : stock quasi ecoule, les rares "Nouveau" restants sont
+// de toute facon repris par rafaleActionsCandidats ci-dessous, doublon
+// devenu inutile). Il reste deux ecrans dans l'onglet Prospects : "Rafale :
+// trier" (rafaleMode "tri") classe rapidement les ambigus (jamais contactes
+// vs. deja contactes il y a des mois, avant que ce suivi existe) sans jamais
+// envoyer de message -- elle couvre aussi, depuis le 02/09/2026, le statut
+// "À traiter" (meme origine que "Nouveau" : pose par defaut a l'import en
+// lot, voir Code.gs/STATUTS_ELIGIBLES_TRI) en plus de "Nouveau", pour ne
+// plus laisser ce stock hors d'atteinte de toute rafale (voir
+// rafaleTriJamaisContacte, qui bascule desormais explicitement le Statut
+// vers "Nouveau" pour que ces prospects rejoignent ensuite normalement
+// rafaleActionsCandidats). "Rafale : actions" (tableau de bord) est
+// permanente : elle traite tout ce qui revient en continu une fois le stock
+// ecoule -- envoi des relances/reprises en attente ET decisions J+7/J+1 --
+// en une seule file triee par urgence, chaque carte adaptee a son type. Les
+// deux partagent le meme mecanisme de carte (rafaleMode "actions"), seule la
+// file differe.
+// Un quatrieme mode, "connexions" (rafaleMode "connexions"), balaie
+// specifiquement les demandes de connexion en attente -- volontairement PAS
+// integre a rafaleActionsCandidats/DECISION_CONFIG, voir ouvrirRafaleConnexions
+// plus bas.
+let rafaleMode = null; // "tri" | "actions" | "connexions"
 let rafaleQueue = [];
 let rafaleIndex = 0;
+let rafaleConnexionEnEnvoi = false; // sous-etape "message copie, en attente de confirmation" de renderRafaleConnexionsCard
 
 function dateToIso(d) {
   const y = d.getFullYear();
@@ -3272,11 +3344,15 @@ function fermerRafale() {
   rafaleMode = null;
   rafaleQueue = [];
   rafaleTriStage = null;
+  rafaleConnexionEnEnvoi = false;
 }
 function rafalePrecedent() {
   if (rafaleIndex > 0) rafaleIndex--;
   if (rafaleMode === "tri") {
     renderRafaleTriCard();
+  } else if (rafaleMode === "connexions") {
+    rafaleConnexionEnEnvoi = false;
+    renderRafaleConnexionsCard();
   } else {
     const p = rafaleQueue[rafaleIndex];
     preparerActionEnvoi(p);
@@ -3292,15 +3368,22 @@ function rafaleEnTeteHtml(p, total) {
   `;
 }
 
-// ─── Rafale 1 : tri des "Nouveau" ambigus ───
+// ─── Rafale 1 : tri des "Nouveau"/"À traiter" ambigus ───
 
 function ouvrirRafaleTri() {
   // !p.trieRafale exclut les "Jamais contacté" deja confirmes lors d'une
-  // session precedente -- ce bouton ne change pas le Statut (voir
-  // rafaleTriJamaisContacte), donc sans ce marqueur ils reapparaitraient a
-  // chaque reouverture de Rafale : trier.
-  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.trieRafale).slice().sort(comparerDateAjoutDesc);
-  if (rafaleQueue.length === 0) { alert("Rien à trier : aucun prospect en statut Nouveau."); return; }
+  // session precedente -- pour un "Nouveau", ce bouton ne change pas le
+  // Statut (voir rafaleTriJamaisContacte), donc sans ce marqueur ils
+  // reapparaitraient a chaque reouverture de Rafale : trier. Inclut aussi
+  // "À traiter" depuis le 02/09/2026 (demande de Marie) : meme origine que
+  // "Nouveau" (pose par defaut a l'import en lot, voir Code.gs/
+  // STATUTS_ELIGIBLES_TRI), mais jusque-la hors d'atteinte de toute rafale
+  // (rafaleActionsCandidats ne filtre que sur "Nouveau") -- 162 prospects
+  // dormants reperes le 02/09/2026. rafaleTriJamaisContacte() bascule
+  // desormais leur Statut vers "Nouveau" pour qu'ils rejoignent ensuite
+  // normalement rafaleActionsCandidats, plutot que de rester coinces.
+  rafaleQueue = currentData.prospects.filter(p => (p.statut === "Nouveau" || p.statut === "À traiter") && !p.trieRafale).slice().sort(comparerDateAjoutDesc);
+  if (rafaleQueue.length === 0) { alert("Rien à trier : aucun prospect en statut Nouveau ou À traiter."); return; }
   rafaleMode = "tri";
   rafaleIndex = 0;
   document.getElementById("rafale-overlay").hidden = false;
@@ -3368,13 +3451,24 @@ function rafaleTriFermerEtape() {
   rafaleTriStage = null;
 }
 async function rafaleTriJamaisContacte() {
-  // Le Statut/Date 1er message restent inchanges (l'etat par defaut est deja
-  // correct pour un vrai jamais-contacte -- il doit rester "Nouveau" sans
-  // date pour etre repris plus tard par Rafale : premiers messages). Seul
-  // le marqueur trieRafale est ecrit, pour ne plus le representer ici.
+  // Pour un "Nouveau", Date 1er message reste inchangee (l'etat par defaut
+  // est deja correct pour un vrai jamais-contacte -- il doit rester "Nouveau"
+  // sans date pour etre repris plus tard par rafaleActionsCandidats). Pour un
+  // "À traiter" (meme origine que "Nouveau", voir ouvrirRafaleTri), le Statut
+  // bascule desormais explicitement vers "Nouveau" -- ajoute le 02/09/2026 :
+  // sans cette normalisation, ces prospects restaient invisibles de
+  // rafaleActionsCandidats (qui ne filtre que sur "Nouveau") une fois
+  // trieRafale pose, coinces dans un angle mort permanent. Le marqueur
+  // trieRafale est toujours ecrit dans les deux cas, pour ne plus les
+  // representer ici.
   const p = rafaleQueue[rafaleIndex];
+  const etaitATraiter = p.statut === "À traiter";
   p.trieRafale = "1";
   if (!(await updateField(p.ligne, "trieRafale", "1"))) return;
+  if (etaitATraiter) {
+    p.statut = "Nouveau";
+    if (!(await updateField(p.ligne, "statut", "Nouveau"))) return;
+  }
   rafaleIndex++;
   renderRafaleTriCard();
 }
@@ -3539,15 +3633,6 @@ function rafaleActionsCandidats() {
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 
   return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter];
-}
-function ouvrirRafalePremiersMessages() {
-  rafaleQueue = currentData.prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).slice().sort(comparerDateAjoutDesc);
-  if (rafaleQueue.length === 0) { alert("Rien à envoyer : aucun prospect Nouveau jamais contacté."); return; }
-  rafaleMode = "actions";
-  rafaleIndex = 0;
-  document.getElementById("rafale-overlay").hidden = false;
-  preparerActionEnvoi(rafaleQueue[0]);
-  renderRafaleActionCard();
 }
 function ouvrirRafaleActions() {
   rafaleQueue = rafaleActionsCandidats();
@@ -3722,6 +3807,148 @@ async function rafaleActionsDecisionClasser(statutCible) {
   renderRafaleActionCard();
 }
 
+// ─── Rafale : demandes de connexion en attente ───
+// Demande de Marie le 02/09/2026 : le statut "En attente de connexion" n'est
+// JAMAIS repris par rafaleActionsCandidats (voir DECISION_CONFIG, qui ne le
+// liste pas) -- il n'a droit qu'au delai de 3 semaines du popup quotidien
+// (maybeShowReminderPopup, connexionsAPurger), qui se contente de suggerer
+// une suppression. Resultat : aucun moyen de reperer, AVANT ces 3 semaines,
+// les demandes de connexion deja acceptees sur LinkedIn en attendant de
+// pouvoir enfin envoyer le tout premier message. Cette rafale balaie TOUTES
+// les demandes en attente (pas seulement les 3+ semaines, volontairement
+// distinct de ce delai qui reste inchange pour la purge) et laisse Marie
+// decider carte par carte, sans ecrire quoi que ce soit pour celles
+// toujours en attente (le compteur des 3 semaines n'est donc jamais
+// perturbe par un simple passage dans cette rafale).
+function ouvrirRafaleConnexions() {
+  rafaleQueue = currentData.prospects
+    .filter(p => p.statut === "En attente de connexion")
+    .slice()
+    // Plus ancienne d'abord : priorise celles qui approchent ou depassent deja
+    // les 3 semaines. Date inconnue (prospects anciens, avant l'ajout de la
+    // colonne V) reléguée en fin de file plutôt qu'en tête, faute de moyen de
+    // juger son urgence réelle.
+    .sort((a, b) => {
+      const da = parseFrDate(a.dateAttenteConnexion);
+      const db = parseFrDate(b.dateAttenteConnexion);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da - db;
+    });
+  if (rafaleQueue.length === 0) { alert("Rien à balayer : aucune demande de connexion en attente."); return; }
+  rafaleMode = "connexions";
+  rafaleIndex = 0;
+  rafaleConnexionEnEnvoi = false;
+  document.getElementById("rafale-overlay").hidden = false;
+  renderRafaleConnexionsCard();
+}
+function renderRafaleConnexionsCard() {
+  rafaleConnexionEnEnvoi = false;
+  const total = rafaleQueue.length;
+  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
+  if (rafaleIndex >= total) {
+    document.getElementById("rafale-content").innerHTML = `
+      <h2>Balayage terminé</h2>
+      <p class="muted">${total} demande${total > 1 ? "s" : ""} de connexion passée${total > 1 ? "s" : ""} en revue.</p>
+      <div class="modal-actions">${boutonPrecedent}<button class="btn" onclick="fermerRafale()">Fermer</button></div>
+    `;
+    return;
+  }
+  const p = rafaleQueue[rafaleIndex];
+  // Ouvre le profil automatiquement, comme les autres rafales -- verifier sur
+  // LinkedIn si la demande a ete acceptee est tout l'objet de cette rafale.
+  if (p.lien) window.open(p.lien, "_blank");
+  const j = joursEcoules(p.dateAttenteConnexion);
+  const depuis = j === null ? "date de la demande inconnue" : `en attente depuis ${j} jour${j > 1 ? "s" : ""}${j >= 21 ? " — 3 semaines dépassées" : ""}`;
+  document.getElementById("rafale-content").innerHTML = `
+    ${rafaleEnTeteHtml(p, total)}
+    <p class="muted" style="margin-bottom:1rem;">${escapeHtml(depuis)}</p>
+    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+      <button class="btn" onclick="rafaleConnexionAcceptee()">1 · A accepté → envoyer le 1er message</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionEnAttente()">2 · Toujours en attente → suivant</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionSupprimer()">3 · Supprimer (jamais acceptée)</button>
+    </div>
+    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3, Retour arrière = précédent, Échap = quitter.</p>
+    <div class="modal-actions" style="margin-top:1.5rem;">
+      ${boutonPrecedent}
+      <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
+    </div>
+  `;
+}
+// Copie le message "Nouveau" (jamais encore envoye a cette personne -- elle
+// attendait la connexion, voir templateKeyPourEnvoi qui utiliserait a tort la
+// cle "En attente de connexion", sans template associe) et bascule la carte
+// en confirmation, meme mecanique en deux temps que renderRafaleActionCard
+// (copie -> "Envoyé → suivant"). Copie faite en reponse directe au clic (pas
+// apres un await), donc jamais bloquee par une perte de focus -- voir
+// preparerActionEnvoi pour le meme garde-fou ailleurs.
+function rafaleConnexionAcceptee() {
+  const p = rafaleQueue[rafaleIndex];
+  const template = messageTemplatesActuels()["Nouveau"] || "";
+  const prenom = (p.nom || "").split(" ")[0];
+  copierTexte(template.replace("{prenom}", prenom));
+  rafaleConnexionEnEnvoi = true;
+  const boutonPrecedent = `<button class="btn btn--ghost" ${rafaleIndex === 0 ? "disabled" : ""} onclick="rafalePrecedent()">← Précédent</button>`;
+  document.getElementById("rafale-content").innerHTML = `
+    ${rafaleEnTeteHtml(p, rafaleQueue.length)}
+    <p class="muted" style="margin-bottom:1rem;">Message "Nouveau" copié dans le presse-papier ✓ — colle-le sur LinkedIn, puis confirme.</p>
+    <div class="modal-actions" style="justify-content:flex-start;">
+      <button class="btn" onclick="rafaleConnexionAccepteeValider()">Envoyé → suivant (Entrée)</button>
+      <button class="btn btn--ghost" onclick="renderRafaleConnexionsCard()">Annuler</button>
+    </div>
+    <div class="modal-actions" style="margin-top:1.5rem;">${boutonPrecedent}<button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button></div>
+  `;
+}
+// Meme action serveur que le tout premier message d'un "Nouveau"
+// (updateProspectDejaContacte, voir rafaleActionsEnvoyerSuivant) -- le statut
+// nomme toujours l'etape EN ATTENTE, donc "1er message envoyé" doit devenir
+// "Première relance", jamais rester "En attente de connexion" ni redevenir
+// "Nouveau" (sinon nextRelance()/rafaleActionsCandidats ne la reprend plus).
+async function rafaleConnexionAccepteeValider() {
+  const p = rafaleQueue[rafaleIndex];
+  const iso1erMessage = dateToIso(new Date());
+  let res;
+  try {
+    res = await jsonpCall({ action: "updateProspectDejaContacte", ligne: p.ligne, date1erMessage: iso1erMessage, nbRelances: "0", statut: "Première relance" });
+  } catch (err) {
+    alert("Échec de l'enregistrement (connexion). Réessaie.");
+    loadData(true);
+    return;
+  }
+  if (!res || !res.ok) { alert("Échec de l'enregistrement : " + (res && res.erreur || "erreur inconnue")); return; }
+  p.date1erMessage = isoDateToFr(iso1erMessage);
+  p.nbRelances = "0";
+  p.statut = "Première relance";
+  rafaleIndex++;
+  renderRafaleConnexionsCard();
+}
+// Toujours en attente : n'ecrit rien (dateAttenteConnexion reste intacte) --
+// le compte a rebours des 3 semaines du popup quotidien continue de courir
+// normalement, exactement comme demande par Marie.
+function rafaleConnexionEnAttente() {
+  rafaleIndex++;
+  renderRafaleConnexionsCard();
+}
+// Supprime directement depuis la rafale (demande de Marie le 02/09/2026,
+// pour ne pas devoir rouvrir le tableau Prospects et rechercher la personne
+// une fois reperee ici) -- meme action serveur que le bouton "Suppr." de la
+// table (deleteProspect), voir aussi maybeShowReminderPopup qui suggere deja
+// cette suppression au bout de 3 semaines sans reponse.
+async function rafaleConnexionSupprimer() {
+  const p = rafaleQueue[rafaleIndex];
+  if (!confirm(`Supprimer ${p.nom} des prospects ? (demande de connexion jamais acceptée)`)) return;
+  try {
+    await jsonpCall({ action: "deleteProspect", ligne: p.ligne });
+  } catch (err) {
+    alert("Échec de la suppression (connexion). Réessaie.");
+    return;
+  }
+  loadData(true);
+  rafaleIndex++;
+  renderRafaleConnexionsCard();
+}
+
 document.addEventListener("keydown", (e) => {
   const overlay = document.getElementById("rafale-overlay");
   if (!overlay || overlay.hidden) return;
@@ -3754,6 +3981,13 @@ document.addEventListener("keydown", (e) => {
       e.preventDefault();
       rafaleActionsEnvoyerSuivant();
     }
+  } else if (rafaleMode === "connexions") {
+    if (!rafaleQueue[rafaleIndex]) return;
+    if (rafaleConnexionEnEnvoi) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rafaleConnexionAccepteeValider(); }
+    } else if (e.key === "1") rafaleConnexionAcceptee();
+    else if (e.key === "2" || e.key === "Enter") rafaleConnexionEnAttente();
+    else if (e.key === "3") rafaleConnexionSupprimer();
   }
 });
 
