@@ -3369,6 +3369,7 @@ function rafalePrecedent() {
     renderRafaleTriCard();
   } else if (rafaleMode === "connexions") {
     rafaleConnexionEnEnvoi = false;
+    preparerConnexionAnticipee(rafaleQueue[rafaleIndex]);
     renderRafaleConnexionsCard();
   } else {
     const p = rafaleQueue[rafaleIndex];
@@ -3885,7 +3886,29 @@ function ouvrirRafaleConnexions() {
   rafaleIndex = 0;
   rafaleConnexionEnEnvoi = false;
   document.getElementById("rafale-overlay").hidden = false;
+  preparerConnexionAnticipee(rafaleQueue[0]);
   renderRafaleConnexionsCard();
+}
+// Copie le message "Nouveau" PAR ANTICIPATION, avant meme d'ouvrir l'onglet
+// LinkedIn -- demande de Marie le 08/09/2026 : sans ca, le message n'etait
+// copie qu'au clic sur "1 · A accepte" (voir rafaleConnexionAcceptee),
+// obligeant un aller-retour CRM -> LinkedIn -> CRM -> LinkedIn (verifier
+// l'acceptation, puis revenir cliquer, puis retourner coller). DOIT etre
+// appelee en reponse DIRECTE a un clic, JAMAIS apres un await (meme regle
+// que preparerActionEnvoi) -- bug constate le 08/09/2026 : appelee depuis
+// l'interieur de renderRafaleConnexionsCard(), elle s'executait aussi apres
+// les await de rafaleConnexionSupprimer/Reconnecter/AccepteeValider/
+// AccepteeReclasser (ecriture serveur avant d'avancer a la carte suivante),
+// moment ou le focus a deja pu quitter l'onglet -- navigator.clipboard.
+// writeText() echouait alors et copierTexte() retombait sur son prompt()
+// natif, un popup bloquant intrusif a chaque carte. Desormais appelee par
+// chaque gestionnaire de clic AVANT son premier await (voir ces fonctions),
+// jamais depuis renderRafaleConnexionsCard() elle-meme.
+function preparerConnexionAnticipee(p) {
+  if (!p) return;
+  const template = messageTemplatesActuels()["Nouveau"] || "";
+  const prenom = (p.nom || "").split(" ")[0];
+  copierTexte(template.replace("{prenom}", prenom));
 }
 function renderRafaleConnexionsCard() {
   rafaleConnexionEnEnvoi = false;
@@ -3900,19 +3923,6 @@ function renderRafaleConnexionsCard() {
     return;
   }
   const p = rafaleQueue[rafaleIndex];
-  // Copie le message "Nouveau" PAR ANTICIPATION, avant meme d'ouvrir l'onglet
-  // LinkedIn -- demande de Marie le 08/09/2026 : sans ca, le message n'etait
-  // copie qu'au clic sur "1 · A accepte" (voir rafaleConnexionAcceptee),
-  // obligeant un aller-retour CRM -> LinkedIn -> CRM -> LinkedIn (verifier
-  // l'acceptation, puis revenir cliquer, puis retourner coller). Copie ici
-  // AVANT window.open (meme regle que preparerActionEnvoi : window.open
-  // deplace le focus, et navigator.clipboard.writeText() echoue silencieusement
-  // des que le focus a quitte cet onglet) -- le presse-papier est donc deja
-  // pret des l'ouverture du profil, que la demande soit finalement acceptee
-  // ou non (sans consequence si elle ne l'est pas, juste du texte inutilise).
-  const templateAnticipe = messageTemplatesActuels()["Nouveau"] || "";
-  const prenomAnticipe = (p.nom || "").split(" ")[0];
-  copierTexte(templateAnticipe.replace("{prenom}", prenomAnticipe));
   // Ouvre le profil automatiquement, comme les autres rafales -- verifier sur
   // LinkedIn si la demande a ete acceptee est tout l'objet de cette rafale.
   if (p.lien) window.open(p.lien, "_blank");
@@ -3974,6 +3984,7 @@ function rafaleConnexionAcceptee() {
 // (classerProspect), juste reutilisee ici.
 async function rafaleConnexionAccepteeReclasser(statutCible) {
   const p = rafaleQueue[rafaleIndex];
+  preparerConnexionAnticipee(rafaleQueue[rafaleIndex + 1]);
   if (!(await classerProspect(p.ligne, statutCible))) return;
   rafaleIndex++;
   renderRafaleConnexionsCard();
@@ -3985,6 +3996,7 @@ async function rafaleConnexionAccepteeReclasser(statutCible) {
 // "Nouveau" (sinon nextRelance()/rafaleActionsCandidats ne la reprend plus).
 async function rafaleConnexionAccepteeValider() {
   const p = rafaleQueue[rafaleIndex];
+  preparerConnexionAnticipee(rafaleQueue[rafaleIndex + 1]);
   const iso1erMessage = dateToIso(new Date());
   let res;
   try {
@@ -4005,6 +4017,7 @@ async function rafaleConnexionAccepteeValider() {
 // le compte a rebours des 3 semaines du popup quotidien continue de courir
 // normalement, exactement comme demande par Marie.
 function rafaleConnexionEnAttente() {
+  preparerConnexionAnticipee(rafaleQueue[rafaleIndex + 1]);
   rafaleIndex++;
   renderRafaleConnexionsCard();
 }
@@ -4019,6 +4032,7 @@ function rafaleConnexionEnAttente() {
 // reversible, pas de perte de donnees.
 async function rafaleConnexionReconnecter() {
   const p = rafaleQueue[rafaleIndex];
+  preparerConnexionAnticipee(rafaleQueue[rafaleIndex + 1]);
   const dans1Mois = new Date(today0().getTime());
   dans1Mois.setMonth(dans1Mois.getMonth() + 1);
   if (!(await updateField(p.ligne, "dateRappel", dateToIso(dans1Mois)))) return;
@@ -4036,6 +4050,7 @@ async function rafaleConnexionReconnecter() {
 async function rafaleConnexionSupprimer() {
   const p = rafaleQueue[rafaleIndex];
   if (!confirm(`Supprimer ${p.nom} des prospects ? (demande de connexion jamais acceptée, ne suit pas non plus)`)) return;
+  preparerConnexionAnticipee(rafaleQueue[rafaleIndex + 1]);
   try {
     await jsonpCall({ action: "deleteProspect", ligne: p.ligne });
   } catch (err) {
