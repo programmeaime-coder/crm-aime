@@ -41,9 +41,9 @@
      (coherent avec les badges existants), Autonomie/"initiative du
      prospect" partagent un meme vert pomme doux, Miroir en beige, Froid en
      bleu clair, "bouche a oreille" en jaune citron doux. */
-  --viz-offre-autonomie: #93c07a;
-  --viz-offre-miroir: #c9b896;
-  --viz-offre-sur-mesure: var(--bordeaux);
+  --viz-offre-autonomie: #f3e8f7;
+  --viz-offre-miroir: #d6c7bd;
+  --viz-offre-sur-mesure: #b98089;
   /* Origine : taupe / orange (proche du logo) / nuance beige entre les deux --
      decision finale de Marie le 16/08 apres plusieurs allers-retours. */
   --viz-origine-propose: #a89684;
@@ -99,8 +99,13 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 /* Variante compacte pour l'onglet Stats -- ne s'etire pas sur toute la
    largeur, tuiles plus petites. N'affecte pas .stats/.stat de base (utilise
    ailleurs, ex. Tableau de bord). */
-.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; max-width: 100%; margin-bottom: 1.75rem; align-self: flex-start; }
-.stats--compact .stat { padding: 0.8rem 1.4rem; min-width: 120px; }
+/* background:none + bordure par tuile (au lieu du fond partage de .stats,
+   qui dessine les separateurs via les gaps mais restait visible en gris dans
+   la case vide d'une derniere ligne incomplete -- repere par Marie le 08/09,
+   ex. la bande des 5 KPI qui passe a 4+1 tuiles sur un ecran etroit). Meme
+   principe de carte bordee que .tplab-col plus bas. */
+.stats--compact { display: inline-flex; flex-wrap: wrap; width: auto; max-width: 100%; margin-bottom: 1.75rem; align-self: flex-start; background: none; gap: 1px; }
+.stats--compact .stat { padding: 0.8rem 1.4rem; min-width: 120px; border: 0.5px solid var(--border); }
 .stats--compact .stat__value { font-size: 21px; }
 /* Rangee forcee sur une seule ligne (contrairement a .stats--compact qui
    wrap des que le contenu depasse) -- utilisee pour le Test A/B, deux
@@ -117,6 +122,7 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .stat__trend--up { color: var(--success); }
 .stat__trend--down { color: var(--bordeaux); }
 .stat__trend--flat { color: var(--text-muted); }
+.stat__trend-ref { color: var(--text-muted); font-weight: 400; }
 /* Variante resserree pour la ligne "Envoyes cette semaine" (4 tuiles avec
    trend en dessous) -- pour que tout reste sur une seule ligne, demande de
    Marie le 27/08. N'affecte pas les autres usages de .stats--compact. */
@@ -151,6 +157,7 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .btn { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 9px 18px; border: 0.5px solid var(--border); background: var(--bordeaux); color: #fff; cursor: pointer; }
 .btn:hover { opacity: 0.88; }
 .btn--ghost { background: #fff; color: var(--text); }
+.btn--small { padding: 5px 12px; font-size: 11.5px; }
 .recherche-input { font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 0.5rem 0.75rem; border: 0.5px solid var(--border); background: #fff; min-width: 180px; }
 .recherche-input:focus { outline: none; border-color: var(--bordeaux); }
 
@@ -374,41 +381,52 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .profil-cible__chip { font-size: 12.5px; background: #fff; border: 0.5px solid var(--border); padding: 5px 12px; }
 .profil-cible__chip b { color: var(--bordeaux); }
 
-.pie-chart { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
-.pie-chart__circle { border-radius: 50%; flex-shrink: 0; }
-.pie-legend { display: flex; flex-direction: column; gap: 0.6rem; }
-.pie-legend__item { display: flex; align-items: center; gap: 0.5rem; font-size: 13px; }
-.pie-legend__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+/* Remplace l'ancien camembert (conic-gradient) -- la recherche est sans appel
+   sur ce point (Cleveland & McGill : longueur/position sur une echelle
+   commune se lit plus vite et plus juste qu'un angle ou une aire), et avec
+   1 seule categorie reellement renseignee (frequent ici, ex. "Origine" avant
+   que Marie n'ait classe plus d'appels), un camembert affiche un disque plein
+   qui ne dit rien -- equivalent du "camembert a 1 part", releve par Marie le
+   08/09 comme n'ayant pas de sens a etre un graphique circulaire. */
+.segment-bars { display: flex; flex-direction: column; gap: 0.65rem; }
+.segment-bar-row__top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
+.segment-bar-row__label { font-weight: 500; }
+.segment-bar-row__track { background: var(--viz-track-bg); height: 14px; }
+.segment-bar-row__fill { height: 100%; }
 
-.funnel { display: flex; flex-direction: column; gap: 0.7rem; }
-.funnel-row__top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 13px; }
+.funnel { display: flex; flex-direction: column; gap: 0.45rem; }
+.funnel-row__top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; font-size: 13px; }
 .funnel-row__label { font-weight: 500; }
-.funnel-row__track { background: var(--viz-track-bg); height: 20px; position: relative; }
+.funnel-row__track { background: var(--viz-track-bg); height: 15px; position: relative; }
 .funnel-row__bar { position: absolute; left: 0; transition: width 0.3s; }
-.funnel-row__bar--global { top: 0; height: 100%; opacity: 0.3; }
-.funnel-row__bar--mois { top: 15%; height: 62%; opacity: 0.58; box-shadow: 1px 0 0 #fff; }
-.funnel-row__bar--semaine { top: 27%; height: 38%; opacity: 1; box-shadow: 1px 0 0 #fff; }
-.funnel-legend { display: flex; gap: 1.25rem; margin-bottom: 0.9rem; font-size: 11.5px; color: var(--text-muted); }
+/* Opacite fixee en inline par funnelHtml() (varie selon si des periodes sont
+   cochees par-dessus) -- pas de valeur par defaut ici pour eviter toute
+   confusion avec la valeur reellement appliquee. */
+.funnel-row__bar--global { top: 0; height: 100%; }
+.funnel-legend { display: flex; gap: 1.25rem; margin-bottom: 0.5rem; font-size: 11.5px; color: var(--text-muted); }
 .funnel-legend__item { display: flex; align-items: center; gap: 6px; }
 .funnel-legend__swatch { width: 14px; height: 14px; border-radius: 2px; background: var(--text); display: inline-block; }
 .funnel-row__periodes { font-size: 11px; margin-top: 3px; }
+.funnel-periodes-cases { display: flex; gap: 1rem; margin-bottom: 0.7rem; font-size: 12px; color: var(--text-muted); }
+.funnel-periodes-cases label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.funnel-periodes-cases input { cursor: pointer; }
 .funnel-row__note { font-size: 12px; margin-top: 3px; }
 
 /* ─── Stats : sous-blocs de graphiques ─── */
-.viz-block { margin-bottom: 2.25rem; }
+.viz-block { margin-bottom: 1.25rem; }
 .viz-block:last-child { margin-bottom: 0; }
 .viz-block__title { font-size: 13.5px; font-weight: 600; margin-bottom: 0.9rem; }
 .viz-block__caption { min-height: 4.5em; }
 .viz-row { display: flex; gap: 2.5rem; flex-wrap: wrap; align-items: stretch; }
 .viz-row > .viz-block { flex: 1 1 320px; display: flex; flex-direction: column; }
 
-.taux-bars { display: flex; gap: 1.4rem; align-items: flex-end; margin-bottom: 1.1rem; flex: 1; }
-.taux-bar-col { flex: 1 1 0; max-width: 120px; display: flex; flex-direction: column; align-items: center; height: 100%; }
-.taux-bar-col__value { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.taux-bar-col__track { width: 100%; flex: 1; min-height: 40px; max-height: 75px; background: var(--viz-track-bg); display: flex; align-items: flex-end; }
+.taux-bars { display: flex; gap: 0.9rem; align-items: flex-end; margin-bottom: 0.6rem; }
+.taux-bar-col { flex: 1 1 0; max-width: 100px; display: flex; flex-direction: column; align-items: center; }
+.taux-bar-col__value { font-size: 11.5px; font-weight: 600; margin-bottom: 3px; }
+.taux-bar-col__track { width: 100%; min-height: 22px; max-height: 34px; height: 34px; background: var(--viz-track-bg); display: flex; align-items: flex-end; }
 .taux-bar-col__fill { width: 100%; transition: height 0.3s; }
 .taux-bar-col__fill--muted { background: repeating-linear-gradient(135deg, var(--viz-track-bg), var(--viz-track-bg) 4px, #d4d2cc 4px, #d4d2cc 8px); }
-.taux-bar-col__label { font-size: 12px; margin-top: 8px; text-align: center; white-space: nowrap; }
+.taux-bar-col__label { font-size: 10px; margin-top: 5px; text-align: center; white-space: nowrap; }
 .taux-row__suggestion { padding: 0.5rem 0.7rem; border: 0.5px solid var(--bordeaux-mid); background: var(--bordeaux-pale); font-size: 11.5px; line-height: 1.35; }
 .taux-row__suggestion-groupe { margin-top: 0.4rem; }
 .taux-row__suggestion-etape { font-weight: 600; margin-bottom: 0.1rem; }
@@ -416,6 +434,71 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .taux-row__suggestion li { margin-bottom: 0.1rem; }
 .taux-row__suggestion details { margin-top: 0.2rem; }
 .taux-row__suggestion summary { cursor: pointer; color: var(--bordeaux); font-weight: 500; }
+
+/* ─── Stats : panneau "Cette semaine" (north-star en tete d'onglet) ───
+   Fond teinte bordeaux-pale (au lieu du gris neutre --surface) pour que ce
+   panneau se distingue clairement comme LE point de depart de la page,
+   plutot que de ressembler a un bloc gris parmi d'autres -- retouche visuelle
+   demandee par Marie le 08/09 ("pas dingue, pas encore ça"). Connecteur en
+   ligne + badge (plutot qu'une simple fleche texte "→") pour que le funnel se
+   lise comme un cheminement, coherent avec l'esthetique deja en place
+   (bordures fines 0.5px, pas d'ombres, Cormorant Garamond pour les chiffres). */
+.stats-hero { background: var(--bordeaux-pale); border: 0.5px solid var(--bordeaux-mid); padding: 1.1rem 1.4rem; margin-bottom: 0.9rem; }
+.stats-hero__eyebrow { font-family: 'Special Elite', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.7rem; }
+.stats-hero__funnel { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.25rem; }
+.stats-hero__step { text-align: center; min-width: 78px; flex: 1 1 0; }
+.stats-hero__step .stat__value { font-size: 27px; }
+.stats-hero__step .stat__label { color: var(--text); opacity: 0.65; font-size: 9px; margin-top: 0.15rem; }
+/* Connecteur : ligne fine centree + badge pilule "coupant" la ligne (le fond
+   du badge reprend le fond du panneau pour creer l'effet de coupure) --
+   repere sectoriel affiche juste dessous quand il y en a un (demande de
+   Marie le 08/09 : voir des stats de reference directement sur le graphique,
+   pas seulement dans une phrase). */
+.stats-hero__arrow { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 62px; padding-top: 8px; }
+.stats-hero__arrow::before { content: ""; position: absolute; left: 4px; right: 4px; top: 13px; height: 1px; background: var(--bordeaux-mid); }
+.stats-hero__arrow-pct { position: relative; z-index: 1; background: var(--bordeaux-pale); border: 0.5px solid var(--bordeaux-mid); border-radius: 999px; padding: 1px 8px; font-size: 10.5px; font-weight: 600; color: var(--bordeaux); white-space: nowrap; }
+.stats-hero__arrow-ref { margin-top: 3px; font-size: 7.5px; color: var(--text-muted); white-space: nowrap; letter-spacing: 0.01em; }
+.stats-hero__insight { margin-top: 0.7rem; padding: 0.5rem 0.8rem; background: #fff; border-left: 3px solid var(--bordeaux); font-size: 12px; line-height: 1.4; }
+.stats-hero__insight b { color: var(--bordeaux); }
+.stats-hero__insight.muted { border-left-color: var(--bordeaux-mid); background: transparent; }
+
+/* ─── Stats : bande de recap compacte (taux clefs + actions immediates) ───
+   Remplace l'ancienne "bande de KPI" pleine hauteur -- objectif de Marie le
+   08/09 : tout le recap tient sur un ecran, pas de gros chiffres qui ne le
+   meritent pas. Prospects en base / Contactes total (des compteurs cumules
+   qui ne font QUE monter, jamais actionnables au jour le jour -- des vrais
+   "vanity metrics") sont relegues a une simple ligne de note en dessous, au
+   lieu d'une tuile pleine taille comme les taux. */
+.recap-strip { display: flex; flex-wrap: wrap; gap: 1px; background: none; margin: 0 0 0.3rem; }
+.recap-tile { background: #fff; border: 0.5px solid var(--border); padding: 0.35rem 0.6rem; min-width: 100px; max-width: 165px; flex: 1 1 0; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+.recap-tile__value { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; line-height: 1; }
+.recap-tile__label { font-size: 7.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+.recap-tile--action { background: var(--bordeaux-pale); border-color: var(--bordeaux-mid); }
+.recap-tile--action .recap-tile__value { color: var(--bordeaux); }
+.stats-recap-footnote { font-size: 11px; }
+/* Variante encore plus compacte que .recap-tile, pour des tuiles secondaires
+   cote a cote dans une colonne etroite (ex. "Envoyes cette semaine &
+   regularite" sous les barres de taux de reponse) -- doivent tenir sur une
+   seule ligne sans forcer la colonne a s'allonger plus que le funnel a cote,
+   demande de Marie le 08/09. */
+/* Grid a colonnes fixes (5) plutot que flex-wrap : garantit que les 5 tuiles
+   tiennent TOUJOURS sur une seule ligne quelle que soit la largeur exacte de
+   la colonne -- avec flex-wrap, une tuile finissait orpheline sur une 2e
+   ligne et s'etirait sur toute la largeur, agrandissant la colonne de droite
+   bien au-dela du funnel a gauche. Releve par Marie le 08/09. */
+/* 3 par ligne (au lieu de 5) -- 5 sur une ligne rendait le texte illisible
+   (trop reduit), releve par Marie le 08/09. flex-wrap + justify-content:center
+   plutot qu'une grille : la 2e ligne (2 tuiles restantes) se centre toute
+   seule au lieu de laisser une case vide alignee a gauche. */
+.mini-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 0.3rem; }
+.mini-tile { background: #fff; border: 0.5px solid var(--border); padding: 0.4rem 0.5rem; flex: 0 1 calc(33.333% - 1px); min-width: 92px; text-align: center; }
+.mini-tile__value { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 600; line-height: 1; }
+.mini-tile__label { font-size: 7.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+
+/* Sections reléguées en bas d'onglet (rétro/expérimentation) -- même contraste
+   que le reste (pas de fondu), juste placées après tout ce qui est actionnable
+   au quotidien, avec un intitulé qui le dit explicitement. */
+.section--secondary .section__eyebrow { font-style: italic; }
 
 .appels-detail-toggle { margin-top: 1rem; }
 
@@ -1647,6 +1730,13 @@ let afficherHorsCible = false;
 let afficherATraiter = false;
 let afficherDetailAppels = false;
 let afficherPistesBlocage = false;
+// Replie par defaut au chargement -- demande de Marie le 08/09 : l'onglet
+// Stats doit tenir sur un seul ecran ("recap"), le detail (retro/
+// experimentation) reste disponible en un clic mais ne doit pas forcer le
+// scroll par defaut. Le funnel "Ou est-ce que ca bloque" et le taux de
+// reponse, eux, sont restes toujours visibles (demande de Marie le 08/09 :
+// pas cliquer 3-4 boutons pour voir un graphique important).
+let afficherRetro = false;
 let filtreStatut = "";
 const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Reconnecter", "Hors cible", "Pas maintenant", "À traiter"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
@@ -1729,6 +1819,10 @@ function toggleAfficherDetailAppels() {
 }
 function toggleAfficherPistesBlocage() {
   afficherPistesBlocage = !afficherPistesBlocage;
+  render(currentData);
+}
+function toggleAfficherRetro() {
+  afficherRetro = !afficherRetro;
   render(currentData);
 }
 function onFiltreStatutChange(select) {
@@ -2023,30 +2117,24 @@ function renderClientsTable(clients) {
 
 const STATUTS_REPONSE_POSITIVE = ["En conversation", "Recontacter", "Appel découverte", "En attente de paiement"];
 
-function pieChartHtml(segments, sizePx) {
+function segmentBarsHtml(segments) {
   const total = segments.reduce((s, x) => s + x.value, 0);
-  const size = sizePx || 150;
-  if (!total) {
-    return `<div class="pie-chart"><div class="pie-chart__circle" style="width:${size}px;height:${size}px;background:#eee;"></div><p class="muted">Pas encore de données.</p></div>`;
-  }
-  let acc = 0;
-  const actifs = segments.filter(s => s.value > 0);
-  const stops = actifs.map(s => {
-    const start = (acc / total) * 100;
-    acc += s.value;
-    const end = (acc / total) * 100;
-    return `${s.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
-  }).join(", ");
-  const legend = actifs.map(s => `
-    <div class="pie-legend__item">
-      <span class="pie-legend__dot" style="background:${s.color}"></span>
-      <span>${escapeHtml(s.label)} — <b>${s.value}</b> (${Math.round((s.value / total) * 100)}%)</span>
-    </div>
-  `).join("");
+  if (!total) return `<p class="muted">Pas encore de données.</p>`;
+  const actifs = segments.filter(s => s.value > 0).sort((a, b) => b.value - a.value);
+  const max = Math.max(...actifs.map(s => s.value));
   return `
-    <div class="pie-chart">
-      <div class="pie-chart__circle" style="width:${size}px;height:${size}px;background:conic-gradient(${stops});"></div>
-      <div class="pie-legend">${legend}</div>
+    <div class="segment-bars">
+      ${actifs.map(s => `
+        <div class="segment-bar-row">
+          <div class="segment-bar-row__top">
+            <span class="segment-bar-row__label">${escapeHtml(s.label)}</span>
+            <span class="segment-bar-row__value">${s.value} <span class="muted">(${Math.round((s.value / total) * 100)}%)</span></span>
+          </div>
+          <div class="segment-bar-row__track">
+            <div class="segment-bar-row__fill" style="width:${Math.max(2, Math.round((s.value / max) * 100))}%;background:${s.color}"></div>
+          </div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
@@ -2087,17 +2175,42 @@ function couleurFunnelParSeuil(pct) {
 // contactes (toutes les deux sur la meme base, pas chainees l'une a l'autre),
 // Appel decouverte et Client = % des prospects totaux.
 // Chaque etape peut porter valeurMois/valeurSemaine en plus de valeur
-// (global) -- rendues en barres imbriquees dans la meme piste (global tres
-// clair en fond pleine hauteur, mois plus fonce et plus fin, semaine encore
-// plus fonce et fin par-dessus), plutot que 3 graphiques separes. Demande de
-// Marie le 16/08. Mois/semaine utilisent la MEME base (e.base) que le global
-// pour rester sur une echelle comparable -- approximation assumee (le vrai
-// denominateur "propre a la semaine" serait plus complexe et pas forcement
-// plus lisible).
+// (global), affiches en petit texte sous la barre plutot qu'en barres
+// imbriquees a la meme couleur -- avant (jusqu'au 08/09), mois/semaine
+// etaient rendus en barres superposees en opacite decroissante MAIS toujours
+// coloriees d'apres le statut du taux GLOBAL, jamais le leur : une etape a
+// 74% (verte, "bon") affichait donc sa barre "cette semaine" en vert meme si
+// le taux de LA semaine etait mauvais -- signale par Marie comme illisible/
+// trompeur le 08/09. Le texte evite ce risque : ce sont des comptages, pas
+// des taux, donc pas de couleur de statut a leur appliquer a tort.
+// imbrique=true : rendu d'origine (barres global/mois/semaine imbriquees en
+// opacite croissante, toutes coloriees d'apres le statut du taux GLOBAL).
+// imbrique=false : rendu du 08/09 (une seule barre, coloriee d'apres SON
+// PROPRE taux, mois/semaine en texte en dessous). Les deux cohabitent avec
+// un bouton pour basculer -- Marie veut comparer les deux en direct avant de
+// choisir, plutot que se fier a son souvenir de l'original.
+// Ordre du plus large au plus etroit (annee ⊇ mois ⊇ semaine) -- determine
+// l'imbrication des barres (la plus large en dehors) et l'ordre du texte de
+// detail pour les periodes decochees.
+const FUNNEL_ORDRE_PERIODES = ["annee", "mois", "semaine"];
+const FUNNEL_LABELS_PERIODES = { annee: "cette année", mois: "ce mois-ci", semaine: "cette semaine" };
+// Cases a cocher Semaine/Mois/Annee (etat global, demande de Marie le 08/09:
+// remettre les niveaux de teinte d'origine, mais pilotables plutot que figes).
+// Une periode cochee devient une barre imbriquee dans la barre globale (comme
+// l'affichage d'origine du 16/08) ; decochee, elle repasse en simple texte
+// "dont X <periode>" sous la barre (l'affichage simplifie du 08/09). Les deux
+// cohabitent donc dans le meme graphique selon ce que Marie coche.
+let funnelPeriodesCochees = { annee: false, mois: true, semaine: true };
+function toggleFunnelPeriode(cle) {
+  funnelPeriodesCochees[cle] = !funnelPeriodesCochees[cle];
+  render(currentData);
+}
 function funnelHtml(etapes) {
+  const cochees = FUNNEL_ORDRE_PERIODES.filter(k => funnelPeriodesCochees[k]);
+  const N = cochees.length;
   return `
     <div class="funnel">
-      ${etapes.map((e, i) => {
+      ${etapes.map((e) => {
         const pct = e.base ? Math.round((e.valeur / e.base) * 100) : null;
         // Le % peut depasser 100 (ex. Client compte parfois des clientes sans
         // Appel decouverte trace) -- afficher "100%+" plutot qu'un chiffre
@@ -2112,10 +2225,28 @@ function funnelHtml(etapes) {
         // arrondissant a 0%).
         const largeur = pct !== null ? (pct > 0 ? Math.max(2, Math.min(pct, 100)) : 0) : 2;
         const couleur = pct !== null ? couleurFunnelParSeuil(Math.min(pct, 100)) : "var(--text-muted)";
-        const pctMoisBrut = (e.base && e.valeurMois !== undefined) ? Math.round((e.valeurMois / e.base) * 100) : null;
-        const pctSemaineBrut = (e.base && e.valeurSemaine !== undefined) ? Math.round((e.valeurSemaine / e.base) * 100) : null;
-        const pctMois = pctMoisBrut !== null ? (pctMoisBrut > 0 ? Math.max(2, Math.min(100, pctMoisBrut)) : 0) : null;
-        const pctSemaine = pctSemaineBrut !== null ? (pctSemaineBrut > 0 ? Math.max(2, Math.min(100, pctSemaineBrut)) : 0) : null;
+        const valeurParCle = { annee: e.valeurAnnee, mois: e.valeurMois, semaine: e.valeurSemaine };
+
+        // Barre globale : opacite pleine (0.65) si rien n'est coche (rendu
+        // simple, seule barre affichee) ; plus estompee (0.3, comme a
+        // l'origine) des qu'au moins une barre est imbriquee par-dessus,
+        // sinon les deux se confondraient visuellement.
+        const opaciteGlobale = N === 0 ? 0.65 : 0.3;
+        const barresNichees = cochees.map((cle, i) => {
+          const v = valeurParCle[cle];
+          if (v === undefined || !e.base) return "";
+          const pctBrut = Math.round((v / e.base) * 100);
+          const pctNiche = pctBrut > 0 ? Math.max(2, Math.min(100, pctBrut)) : 0;
+          const marge = (i + 1) * (36 / (N + 1));
+          const opacite = (0.45 + (i + 1) * (0.55 / N)).toFixed(2);
+          return `<div class="funnel-row__bar" style="top:${marge}%;height:${100 - 2 * marge}%;width:${pctNiche}%;background:${couleur};opacity:${opacite};"></div>`;
+        }).join("");
+
+        const decochees = FUNNEL_ORDRE_PERIODES.filter(k => !funnelPeriodesCochees[k] && valeurParCle[k] !== undefined);
+        const detailHtml = decochees.length
+          ? `<div class="funnel-row__periodes muted">dont ${decochees.map(k => `${valeurParCle[k] || 0} ${FUNNEL_LABELS_PERIODES[k]}`).join(", ")}</div>`
+          : "";
+
         return `
           <div class="funnel-row">
             <div class="funnel-row__top">
@@ -2123,10 +2254,10 @@ function funnelHtml(etapes) {
               <span class="funnel-row__value">${e.valeur}${pctAffiche !== null ? ` <span class="muted">(${pctAffiche}${e.baseLabel ? " " + e.baseLabel : ""})</span>` : ""}</span>
             </div>
             <div class="funnel-row__track">
-              <div class="funnel-row__bar funnel-row__bar--global" style="width:${largeur}%;background:${couleur}"></div>
-              ${pctMois !== null ? `<div class="funnel-row__bar funnel-row__bar--mois" style="width:${pctMois}%;background:${couleur}"></div>` : ""}
-              ${pctSemaine !== null ? `<div class="funnel-row__bar funnel-row__bar--semaine" style="width:${pctSemaine}%;background:${couleur}"></div>` : ""}
+              <div class="funnel-row__bar funnel-row__bar--global" style="width:${largeur}%;background:${couleur};opacity:${opaciteGlobale};"></div>
+              ${barresNichees}
             </div>
+            ${detailHtml}
           </div>
         `;
       }).join("")}
@@ -2193,6 +2324,9 @@ function debutSemaine(ref) {
 function debutMois(ref) {
   return new Date(ref.getFullYear(), ref.getMonth(), 1);
 }
+function debutAnnee(ref) {
+  return new Date(ref.getFullYear(), 0, 1);
+}
 // Compte, parmi une liste d'objets, combien ont une date (champ donne, format
 // FR) posterieure ou egale au seuil. Base la meme fonction pour semaine/mois.
 function compterDepuisDate(items, champ, seuil) {
@@ -2249,19 +2383,100 @@ function tauxAvecEffectif(numerateur, denominateur) {
 }
 
 // Petite fleche + % de variation sous une tuile de chiffre (onglet Stats,
-// demande de Marie le 27/08). "avant" peut etre null (indeterminable, ex.
-// ratio 0/0) -- dans ce cas on n'affiche rien plutot qu'un chiffre trompeur.
-function statTrendHtml(actuel, avant) {
+// demande de Marie le 27/08), + la valeur de reference elle-meme entre
+// parentheses (ajoute le 08/09 -- avant, seule la variation etait affichee,
+// impossible de savoir ce que valait le chiffre avant sans deviner). "avant"
+// peut etre null (indeterminable, ex. ratio 0/0) -- dans ce cas on n'affiche
+// rien plutot qu'un chiffre trompeur. estPourcentage ajoute le signe % aux
+// deux valeurs de la reference (les KPI de taux passent deja des % via
+// ratioPct, distincts des KPI de comptage brut).
+function statTrendHtml(actuel, avant, estPourcentage) {
   if (actuel === null || actuel === undefined || avant === null || avant === undefined) return "";
+  const fmt = v => Math.round(v) + (estPourcentage ? "%" : "");
+  const ref = `<span class="stat__trend-ref">(${fmt(avant)} → ${fmt(actuel)})</span>`;
   if (avant === 0) {
     if (actuel === 0) return "";
-    return `<div class="stat__trend stat__trend--up">↑</div>`;
+    return `<div class="stat__trend stat__trend--up">↑ ${ref}</div>`;
   }
   const pct = Math.round(((actuel - avant) / avant) * 100);
-  if (pct === 0) return `<div class="stat__trend stat__trend--flat">→</div>`;
+  if (pct === 0) return `<div class="stat__trend stat__trend--flat">→ ${ref}</div>`;
   const cls = pct > 0 ? "up" : "down";
   const fleche = pct > 0 ? "↑" : "↓";
-  return `<div class="stat__trend stat__trend--${cls}">${fleche} ${Math.abs(pct)}%</div>`;
+  return `<div class="stat__trend stat__trend--${cls}">${fleche} ${Math.abs(pct)}% ${ref}</div>`;
+}
+
+// Panneau "Cette semaine" (north-star en tete de l'onglet Stats, demande de
+// Marie le 08/09 : faire emerger UN chiffre hebdo clair plutot que ~25
+// chiffres a plat). Une etape du mini-funnel hebdo, avec sa fleche de
+// tendance vs la meme periode la semaine derniere.
+function heroFunnelStepHtml(valeur, label, avant) {
+  return `
+    <div class="stats-hero__step">
+      <div class="stat__value">${valeur}</div>
+      <div class="stat__label">${escapeHtml(label)}</div>
+      ${statTrendHtml(valeur, avant)}
+    </div>
+  `;
+}
+// Reperes sectoriels (2026) -- evite de designer "ça bloque" l'etape juste
+// parce qu'elle a le % le plus bas des trois, alors que les etapes d'un
+// funnel de vente n'ont PAS le meme ordre de grandeur naturel (un taux de
+// reponse a un premier message et un taux de signature apres appel
+// decouverte ne se comparent pas entre eux). Repere par Marie le 08/09 avec
+// son propre exemple : un taux de 30% entre RDV et signature n'a rien
+// d'alarmant, c'est dans la moyenne haute du secteur coaching. Sources
+// generalistes (prospection LinkedIn / appels decouverte coaching-conseil),
+// a recalibrer avec l'historique propre de Marie des que assez de semaines
+// de recul existeront :
+// - 1er message -> reponse : ~10-20% (prospection froide LinkedIn)
+// - Appel decouverte -> signature : ~10-30% (coaching), au-dessus de 30% =
+//   le niveau des coachs les plus performants.
+const BENCHMARKS_FUNNEL = {
+  reponse: { min: 10, max: 20, label: "1er message → réponse (prospection froide)" },
+  signature: { min: 10, max: 30, label: "RDV découverte → signature (coaching)" }
+};
+// Fleche + taux de conversion entre deux etapes consecutives du mini-funnel
+// hebdo, avec repere sectoriel affiche directement dessous quand on en a un
+// (pas de couleur bloque/moyen/bon ici -- ce role est deja tenu par le
+// funnel "Ou est-ce que ca bloque ?" plus bas, pas la peine de le dupliquer).
+// Meme code couleur (rouge <=30% / jaune 31-70% / vert >70%) que le funnel
+// "Ou est-ce que ca bloque ?" plus bas -- demande de Marie le 08/09, un seul
+// langage de couleur pour tous les pourcentages de l'onglet plutot qu'un
+// badge neutre ici et des barres coloriees plus bas.
+function heroFunnelArrowHtml(num, den, benchmark) {
+  const pct = den ? Math.round((num / den) * 100) : null;
+  const couleur = pct !== null ? couleurFunnelParSeuil(Math.min(pct, 100)) : "var(--text-muted)";
+  return `
+    <div class="stats-hero__arrow">
+      <span class="stats-hero__arrow-pct" style="${pct !== null ? `color:${couleur};border-color:${couleur};` : ""}">${pct !== null ? pct + "%" : "—"}</span>
+      ${benchmark ? `<span class="stats-hero__arrow-ref">réf. ${benchmark.min}–${benchmark.max}%</span>` : ""}
+    </div>
+  `;
+}
+// Phrase courte : ne pointe une etape que si elle a a la fois (1) un repere
+// sectoriel connu et (2) un taux reellement EN DESSOUS de ce repere -- sinon
+// rien de fiable a en dire (pas de benchmark pour "reponse -> RDV pris"), ou
+// rien d'alarmant a signaler (dans la norme ou au-dessus). n>=3 requis pour
+// eviter qu'un seul cas isole ne fasse une "tendance".
+function heroInsightHtml(contactesSemaine, reponseSemaine, appelSemaine, clientSemaine) {
+  const etapes = [
+    { label: "après le 1er message (avant réponse)", num: reponseSemaine, den: contactesSemaine, benchmark: BENCHMARKS_FUNNEL.reponse },
+    { label: "entre la réponse et le RDV pris", num: appelSemaine, den: reponseSemaine, benchmark: null },
+    { label: "entre le RDV et la signature", num: clientSemaine, den: appelSemaine, benchmark: BENCHMARKS_FUNNEL.signature }
+  ];
+  const fiables = etapes.filter(e => e.den >= 3);
+  if (!fiables.length) return `<p class="stats-hero__insight muted">Pas encore assez d'activité cette semaine pour dégager une tendance.</p>`;
+  const avecRepere = fiables.filter(e => e.benchmark).map(e => Object.assign({ pct: Math.round((e.num / e.den) * 100) }, e));
+  const sousRepere = avecRepere.filter(e => e.pct < e.benchmark.min);
+  if (sousRepere.length) {
+    const e = sousRepere[0];
+    return `<p class="stats-hero__insight"><b>${escapeHtml(e.label)}</b> : ${e.pct}% (${e.num}/${e.den}) — sous le repère du secteur (${e.benchmark.min}–${e.benchmark.max}%, ${escapeHtml(e.benchmark.label)}).</p>`;
+  }
+  if (avecRepere.length) {
+    const meilleure = avecRepere.sort((a, b) => b.pct - a.pct)[0];
+    return `<p class="stats-hero__insight">${meilleure.pct}% ${escapeHtml(meilleure.label)} — dans la norme du secteur ou au-dessus (${meilleure.benchmark.min}–${meilleure.benchmark.max}%). Rien d'alarmant cette semaine.</p>`;
+  }
+  return `<p class="stats-hero__insight muted">Pas assez de recul pour comparer à un repère de marché cette semaine.</p>`;
 }
 
 // Reconstitue nContactes/nRepondus "tels qu'ils etaient" a une date donnee, a
@@ -2426,14 +2641,22 @@ function statsTemplateABData(prospects) {
   return { A: calc(parVariante.A), B: calc(parVariante.B) };
 }
 function templateABHtml(abData) {
-  const ligne = (label, info) => `
+  // Meme seuil de fiabilite que tauxReponseBarsHtml (SEUIL_FIABLE_TAUX) --
+  // avant, un echantillon de 1-3 envois affichait un 33%/100% avec la meme
+  // autorite visuelle qu'un resultat sur des centaines d'envois, releve par
+  // Marie comme trompeur le 08/09.
+  const ligne = (label, info) => {
+    const fiable = info.total >= SEUIL_FIABLE_TAUX;
+    return `
     <div class="tplab-col">
-      <div class="stat__value">${info.total ? info.pct + "%" : "—"}</div>
+      <div class="stat__value ${fiable ? "" : "muted"}">${info.total ? info.pct + "%" : "—"}</div>
       <div class="stat__label">${escapeHtml(label)} ${info.total ? `(${info.repondus}/${info.total})` : "(aucun envoi identifié)"}</div>
+      ${info.total && !fiable ? `<div class="muted" style="font-size:9px;margin-top:2px;">échantillon trop petit (n&lt;${SEUIL_FIABLE_TAUX})</div>` : ""}
     </div>
   `;
+  };
   return `
-    <div class="viz-block__title" style="margin-top:1.1rem;font-size:12.5px;">Test A/B — 1er message</div>
+    <div class="viz-block__title" style="font-size:12.5px;">Test A/B — 1er message</div>
     <div class="tplab-row">
       ${ligne("Template A (ancien)", abData.A)}
       ${ligne("Template B (nouveau)", abData.B)}
@@ -2537,36 +2760,58 @@ function renderStatsSection(data) {
   // le 1er du mois en cours.
   const debutSem = debutSemaine(today0());
   const debutM = debutMois(today0());
+  const debutA = debutAnnee(today0());
   const contactesSemaine = compterDepuisDate(prospects, "date1erMessage", debutSem);
   const contactesMois = compterDepuisDate(prospects, "date1erMessage", debutM);
+  const contactesAnnee = compterDepuisDate(prospects, "date1erMessage", debutA);
   const relance1Semaine = compterDepuisDate(prospects, "dateEnvoiPremiereRelance", debutSem);
   const relance1Mois = compterDepuisDate(prospects, "dateEnvoiPremiereRelance", debutM);
+  const relance1Annee = compterDepuisDate(prospects, "dateEnvoiPremiereRelance", debutA);
   const relance2Semaine = compterDepuisDate(prospects, "dateEntreeStatutRelance", debutSem);
   const relance2Mois = compterDepuisDate(prospects, "dateEntreeStatutRelance", debutM);
+  const relance2Annee = compterDepuisDate(prospects, "dateEntreeStatutRelance", debutA);
   const recontactSemaine = compterDepuisDate(prospects, "dateEnvoiRecontacte", debutSem);
   const appelSemaine = compterDepuisDate(appelsListe, "date", debutSem);
   const appelMois = compterDepuisDate(appelsListe, "date", debutM);
+  const appelAnnee = compterDepuisDate(appelsListe, "date", debutA);
   const clientSemaine = compterDepuisDate(clients, "date", debutSem);
   const clientMois = compterDepuisDate(clients, "date", debutM);
+  const clientAnnee = compterDepuisDate(clients, "date", debutA);
 
   // Tendances vs semaine derniere (fleche + %, demande de Marie le 27/08).
-  // Ligne "Envoyes cette semaine" : semaine derniere complete (lundi->dimanche),
-  // comparee au meme decompte que ci-dessus.
+  // Comparaison a "meme nombre de jours ecoules" plutot qu'a la semaine
+  // derniere complete (lundi->dimanche) -- avant, une semaine EN COURS
+  // (ex. 2 jours ecoules un mardi) etait comparee a 7 jours pleins la
+  // semaine d'avant, ce qui faisait mecaniquement chuter les fleches en
+  // debut de semaine independamment de toute vraie baisse d'activite.
+  // Point souleve par Marie le 08/09 (onglet Stats peu lisible/fiable).
   const debutSemDerniere = new Date(debutSem.getTime());
   debutSemDerniere.setDate(debutSemDerniere.getDate() - 7);
-  const contactesSemaineDerniere = compterEntreDates(prospects, "date1erMessage", debutSemDerniere, debutSem);
-  const relance1SemaineDerniere = compterEntreDates(prospects, "dateEnvoiPremiereRelance", debutSemDerniere, debutSem);
-  const relance2SemaineDerniere = compterEntreDates(prospects, "dateEntreeStatutRelance", debutSemDerniere, debutSem);
-  const recontactSemaineDerniere = compterEntreDates(prospects, "dateEnvoiRecontacte", debutSemDerniere, debutSem);
+  const joursEcoulesCetteSemaine = Math.round((today0().getTime() - debutSem.getTime()) / 86400000) + 1;
+  const finSemaineDerniereComparable = new Date(debutSemDerniere.getTime());
+  finSemaineDerniereComparable.setDate(finSemaineDerniereComparable.getDate() + joursEcoulesCetteSemaine);
+  const contactesSemaineDerniere = compterEntreDates(prospects, "date1erMessage", debutSemDerniere, finSemaineDerniereComparable);
+  const relance1SemaineDerniere = compterEntreDates(prospects, "dateEnvoiPremiereRelance", debutSemDerniere, finSemaineDerniereComparable);
+  const relance2SemaineDerniere = compterEntreDates(prospects, "dateEntreeStatutRelance", debutSemDerniere, finSemaineDerniereComparable);
+  const recontactSemaineDerniere = compterEntreDates(prospects, "dateEnvoiRecontacte", debutSemDerniere, finSemaineDerniereComparable);
+  // Funnel de la semaine (panneau "Cette semaine" en tete d'onglet) : mêmes
+  // dates deja utilisees ci-dessus, plus "a repondu"/"a signe" qui manquaient
+  // encore a cette granularite hebdo.
+  const reponseSemaine = compterDepuisDate(prospects, "dateReponse", debutSem);
+  const reponseSemaineDerniere = compterEntreDates(prospects, "dateReponse", debutSemDerniere, finSemaineDerniereComparable);
+  const appelSemaineDerniere = compterEntreDates(appelsListe, "date", debutSemDerniere, finSemaineDerniereComparable);
+  const clientSemaineDerniere = compterEntreDates(clients, "date", debutSemDerniere, finSemaineDerniereComparable);
 
-  // KPI principaux : "avant" = valeur reconstituee il y a 7 jours (pas une
-  // semaine calendaire ici, ce sont des totaux cumules, pas des compteurs
-  // hebdo -- voir docs/superpowers/specs/2026-08-27-tendance-stats-design.md).
-  const il7j = new Date(today0().getTime());
-  il7j.setDate(il7j.getDate() - 7);
-  const funnelAvant = statsFunnelDataAsOf(prospects, il7j);
-  const appelsAvant = appelsCountAsOf(prospects, clients, il7j);
-  const prospectsEnBaseAvant = prospectsEnBaseAsOf(prospects, il7j);
+  // KPI principaux : "avant" = valeur reconstituee au debut de la semaine en
+  // cours (lundi 00h), pour que toutes les comparaisons de l'onglet utilisent
+  // la meme base "semaine calendaire" -- avant, ces 5 KPI comparaient a J-7
+  // glissant pendant que le reste de la page comparait a la semaine civile,
+  // ce qui rendait impossible de savoir si "la semaine" designait la meme
+  // periode partout. Point souleve par Marie le 08/09. Voir aussi
+  // docs/superpowers/specs/2026-08-27-tendance-stats-design.md.
+  const funnelAvant = statsFunnelDataAsOf(prospects, debutSem);
+  const appelsAvant = appelsCountAsOf(prospects, clients, debutSem);
+  const prospectsEnBaseAvant = prospectsEnBaseAsOf(prospects, debutSem);
 
   const tauxReponseInfosCalculees = tauxReponseInfos([
     {
@@ -2599,112 +2844,147 @@ function renderStatsSection(data) {
   // affichee sur un ratio indeterminable).
   const ratioPct = (num, den) => den ? (num / den) * 100 : null;
 
+  // Signal "regularite" condense en une seule tuile plutot qu'un bloc de 4 --
+  // ne garde que le pire des deux decalages (r1/r2), l'ecart de detail reste
+  // disponible dans "Voir le detail du funnel" plus bas. Demande de Marie le
+  // 08/09 : recap tenant sur un ecran, pas un empilement de blocs egaux.
+  const pireDecalage = Math.max(regularite.r1.delaiMoyen || 0, regularite.r2.delaiMoyen || 0);
+  const aUneRegulariteConnue = regularite.r1.delaiMoyen !== null || regularite.r2.delaiMoyen !== null;
+
+  // Dates ecrites en toutes lettres dans l'eyebrow du panneau "Cette semaine"
+  // -- avant, le texte disait juste "vs meme nombre de jours la semaine
+  // derniere" sans jamais montrer QUELS jours ca designe concretement.
+  // Question directe de Marie le 08/09 : "vs meme jour la semaine
+  // precedente, exemple ici le mardi ?" -- reponse oui, et desormais ecrite
+  // explicitement plutot que sous-entendue.
+  const fmtJour = d => d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+  const finSemaineDerniereAffichage = new Date(finSemaineDerniereComparable.getTime());
+  finSemaineDerniereAffichage.setDate(finSemaineDerniereAffichage.getDate() - 1);
+
   return `
-    <div class="stats stats--compact">
-      <div class="stat"><div class="stat__value">${prospects.length}</div><div class="stat__label">Prospects en base</div>${statTrendHtml(prospects.length, prospectsEnBaseAvant)}</div>
-      <div class="stat"><div class="stat__value">${funnel.nContactes}</div><div class="stat__label">Contactés (≥1 message)</div>${statTrendHtml(funnel.nContactes, funnelAvant.nContactes)}</div>
-      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div><div class="stat__label">Taux de réponse global</div>${statTrendHtml(ratioPct(funnel.nRepondus, funnel.nContactes), ratioPct(funnelAvant.nRepondus, funnelAvant.nContactes))}</div>
-      <div class="stat stat--accent"><div class="stat__value stat__value--bordeaux">${tauxAvecEffectif(appelsListe.length, funnel.nRepondus)}</div><div class="stat__label">Réponses → appel</div>${statTrendHtml(ratioPct(appelsListe.length, funnel.nRepondus), ratioPct(appelsAvant, funnelAvant.nRepondus))}</div>
-      <div class="stat"><div class="stat__value">${tauxAvecEffectif(appelsListe.length, funnel.nContactes)}</div><div class="stat__label">Appels réservés / contactés</div>${statTrendHtml(ratioPct(appelsListe.length, funnel.nContactes), ratioPct(appelsAvant, funnelAvant.nContactes))}</div>
+    <div class="stats-hero">
+      <div class="stats-hero__eyebrow">Du ${fmtJour(debutSem)} à aujourd'hui (${fmtJour(today0())}) — vs du ${fmtJour(debutSemDerniere)} au ${fmtJour(finSemaineDerniereAffichage)} la semaine dernière</div>
+      <div class="stats-hero__funnel">
+        ${heroFunnelStepHtml(contactesSemaine, "Contactés", contactesSemaineDerniere)}
+        ${heroFunnelArrowHtml(reponseSemaine, contactesSemaine, BENCHMARKS_FUNNEL.reponse)}
+        ${heroFunnelStepHtml(reponseSemaine, "Ont répondu", reponseSemaineDerniere)}
+        ${heroFunnelArrowHtml(appelSemaine, reponseSemaine)}
+        ${heroFunnelStepHtml(appelSemaine, "RDV pris", appelSemaineDerniere)}
+        ${heroFunnelArrowHtml(clientSemaine, appelSemaine, BENCHMARKS_FUNNEL.signature)}
+        ${heroFunnelStepHtml(clientSemaine, "Ont signé", clientSemaineDerniere)}
+      </div>
+      ${heroInsightHtml(contactesSemaine, reponseSemaine, appelSemaine, clientSemaine)}
     </div>
 
-    <div class="viz-row" style="align-items:flex-start;">
-      <div>
-        <p class="muted" style="margin-bottom:0.6rem;">Envoyés cette semaine :</p>
-        <div class="stats stats--compact stats--tight">
-          <div class="stat"><div class="stat__value">${contactesSemaine}</div><div class="stat__label">1ers messages</div>${statTrendHtml(contactesSemaine, contactesSemaineDerniere)}</div>
-          <div class="stat"><div class="stat__value">${relance1Semaine}</div><div class="stat__label">Relances 1</div>${statTrendHtml(relance1Semaine, relance1SemaineDerniere)}</div>
-          <div class="stat"><div class="stat__value">${relance2Semaine}</div><div class="stat__label">Relances 2</div>${statTrendHtml(relance2Semaine, relance2SemaineDerniere)}</div>
-          <div class="stat"><div class="stat__value">${recontactSemaine}</div><div class="stat__label">Recontacts</div>${statTrendHtml(recontactSemaine, recontactSemaineDerniere)}</div>
-        </div>
-      </div>
-      <div>
-        <p class="muted" style="margin-bottom:0.6rem;">Régularité (réel vs J+5 / J+12 théorique) :</p>
-        <div class="stats stats--compact">
-          <div class="stat"><div class="stat__value ${regularite.r1.delaiMoyen > 1 ? "stat__value--bordeaux" : ""}">${regularite.r1.delaiMoyen !== null ? delaiLabel(regularite.r1.delaiMoyen) : "—"}</div><div class="stat__label">Relance 1 — décalage ${regularite.r1.n ? "(n=" + regularite.r1.n + ")" : ""}</div></div>
-          <div class="stat"><div class="stat__value">${regularite.r1.pctATemps !== null ? regularite.r1.pctATemps + "%" : "—"}</div><div class="stat__label">Relance 1 — à l'heure</div></div>
-          <div class="stat"><div class="stat__value ${regularite.r2.delaiMoyen > 1 ? "stat__value--bordeaux" : ""}">${regularite.r2.delaiMoyen !== null ? delaiLabel(regularite.r2.delaiMoyen) : "—"}</div><div class="stat__label">Relance 2 — décalage ${regularite.r2.n ? "(n=" + regularite.r2.n + ")" : ""}</div></div>
-          <div class="stat"><div class="stat__value">${regularite.r2.pctATemps !== null ? regularite.r2.pctATemps + "%" : "—"}</div><div class="stat__label">Relance 2 — à l'heure</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section" style="margin-bottom:1.75rem;">
-      <div class="section__head"><span class="section__eyebrow">Efficacité de mes messages</span></div>
-
-      <div class="viz-row">
-        <div class="viz-block" style="flex:1 1 460px;margin-bottom:0;">
-          <div class="viz-block__title">Où est-ce que ça bloque ?</div>
-          <p class="muted" style="margin-bottom:0.6rem;">% = conversion depuis l'étape précédente.</p>
-          <div class="funnel-legend">
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:0.3;"></span>Global</span>
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:0.58;"></span>Ce mois</span>
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="opacity:1;"></span>Cette semaine</span>
+    <div class="viz-row" style="margin-top:0.6rem;">
+      <div class="viz-block" style="flex:1 1 460px;margin-bottom:0;">
+        <div class="recap-strip">
+          <div class="recap-tile">
+            <div class="recap-tile__value" style="color:${couleurFunnelParSeuil(Math.min(Math.round(ratioPct(funnel.nRepondus, funnel.nContactes) || 0), 100))}">${tauxAvecEffectif(funnel.nRepondus, funnel.nContactes)}</div>
+            <div class="recap-tile__label">Taux réponse global</div>
+            ${statTrendHtml(ratioPct(funnel.nRepondus, funnel.nContactes), ratioPct(funnelAvant.nRepondus, funnelAvant.nContactes), true)}
           </div>
-          <div class="funnel-legend" style="margin-top:-0.5rem;">
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-1);opacity:1;"></span>≤ 30% — bloque</span>
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-2);opacity:1;"></span>31–70% — moyen</span>
-            <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-3);opacity:1;"></span>&gt; 70% — bon</span>
+          <div class="recap-tile">
+            <div class="recap-tile__value" style="color:${couleurFunnelParSeuil(Math.min(Math.round(ratioPct(appelsListe.length, funnel.nRepondus) || 0), 100))}">${tauxAvecEffectif(appelsListe.length, funnel.nRepondus)}</div>
+            <div class="recap-tile__label">Réponse → RDV</div>
+            ${statTrendHtml(ratioPct(appelsListe.length, funnel.nRepondus), ratioPct(appelsAvant, funnelAvant.nRepondus), true)}
           </div>
-          ${funnelHtml([
-            { label: "Contactés (1er message envoyé)", valeur: funnel.nContactes, base: prospects.length, baseLabel: "des prospects", valeurMois: contactesMois, valeurSemaine: contactesSemaine },
-            { label: "Relance 1 envoyée", valeur: funnel.nbr1Plus, base: funnel.nContactes, baseLabel: "des contactés", valeurMois: relance1Mois, valeurSemaine: relance1Semaine },
-            { label: "Relance 2 envoyée", valeur: funnel.nbr2Plus, base: funnel.nContactes, baseLabel: "des contactés", valeurMois: relance2Mois, valeurSemaine: relance2Semaine },
-            { label: "Appel découverte", valeur: appelsListe.length, base: prospects.length, baseLabel: "des prospects", valeurMois: appelMois, valeurSemaine: appelSemaine },
-            { label: "Client", valeur: clients.length, base: prospects.length, baseLabel: "des prospects", valeurMois: clientMois, valeurSemaine: clientSemaine }
-          ])}
-          <div class="appels-detail-toggle" style="margin-top:0.6rem;">
-            <button class="btn btn--ghost" onclick="toggleAfficherPistesBlocage()">${afficherPistesBlocage ? "Masquer" : "Voir"} les pistes de blocage</button>
-          </div>
-          ${afficherPistesBlocage ? pistesBlocageHtml(tauxReponseInfosCalculees) : ""}
-        </div>
-        <div class="viz-block" style="flex:1 1 340px;">
-          <div class="viz-block__title">Taux de réponses aux messages</div>
-          <p class="muted" style="margin-bottom:0.6rem;">Scan de réconciliation en cours — ces taux vont remonter au fur et à mesure. Barres grisées = n&lt;${SEUIL_FIABLE_TAUX}.</p>
-          ${tauxReponseBarsHtml(tauxReponseInfosCalculees)}
-          ${templateABHtml(statsTemplateABData(prospects))}
-          ${appelsNonSignes.length ? `
-            <div class="viz-block__title" style="margin-top:1.1rem;font-size:12.5px;">Appels découverte</div>
-            <div class="stats stats--compact">
-              <div class="stat"><div class="stat__value stat__value--success">${appelsListe.length - appelsNonSignes.length}</div><div class="stat__label">Ont signé (sur ${appelsListe.length})</div></div>
-              <div class="stat"><div class="stat__value">${appelsAVenir.length}</div><div class="stat__label">À classer</div></div>
-              <div class="stat"><div class="stat__value">${Math.round(noShowRateGlobal(data.historiqueAppels) * 100)}%</div><div class="stat__label">No-show</div></div>
-              <div class="stat"><div class="stat__value">${tauxAvecEffectif(appelsListe.length - appelsNonSignes.length, appelsListe.length)}</div><div class="stat__label">Signatures/appels</div></div>
+          ${appelsAVenir.length ? `
+            <div class="recap-tile recap-tile--action">
+              <div class="recap-tile__value">${appelsAVenir.length}</div>
+              <div class="recap-tile__label">Appel(s) à classer</div>
+            </div>
+          ` : ""}
+          ${aUneRegulariteConnue ? `
+            <div class="recap-tile ${pireDecalage > 1 ? "recap-tile--action" : ""}">
+              <div class="recap-tile__value">${pireDecalage > 1 ? delaiLabel(pireDecalage) : "À l'heure"}</div>
+              <div class="recap-tile__label">Relances</div>
             </div>
           ` : ""}
         </div>
+        <p class="muted stats-recap-footnote">${prospects.length} prospects en base · ${funnel.nContactes} contactés au total (historique complet) · ${tauxAvecEffectif(appelsListe.length, funnel.nContactes)} ont réservé un appel au global</p>
+
+        <div class="viz-block__title">Où est-ce que ça bloque ?</div>
+        <div class="funnel-legend">
+          <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-1);"></span>≤30% bloque</span>
+          <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-2);"></span>31–70% moyen</span>
+          <span class="funnel-legend__item"><span class="funnel-legend__swatch" style="background:var(--viz-funnel-3);"></span>&gt;70% bon</span>
+        </div>
+        <div class="funnel-periodes-cases">
+          <label><input type="checkbox" onchange="toggleFunnelPeriode('semaine')" ${funnelPeriodesCochees.semaine ? "checked" : ""}> Semaine</label>
+          <label><input type="checkbox" onchange="toggleFunnelPeriode('mois')" ${funnelPeriodesCochees.mois ? "checked" : ""}> Mois</label>
+          <label><input type="checkbox" onchange="toggleFunnelPeriode('annee')" ${funnelPeriodesCochees.annee ? "checked" : ""}> Année</label>
+        </div>
+        ${funnelHtml([
+          { label: "Contactés (1er msg)", valeur: funnel.nContactes, base: prospects.length, baseLabel: "des prospects", valeurAnnee: contactesAnnee, valeurMois: contactesMois, valeurSemaine: contactesSemaine },
+          { label: "Relance 1 envoyée", valeur: funnel.nbr1Plus, base: funnel.nContactes, baseLabel: "des contactés", valeurAnnee: relance1Annee, valeurMois: relance1Mois, valeurSemaine: relance1Semaine },
+          { label: "Relance 2 envoyée", valeur: funnel.nbr2Plus, base: funnel.nContactes, baseLabel: "des contactés", valeurAnnee: relance2Annee, valeurMois: relance2Mois, valeurSemaine: relance2Semaine },
+          { label: "Appel découverte", valeur: appelsListe.length, base: prospects.length, baseLabel: "des prospects", valeurAnnee: appelAnnee, valeurMois: appelMois, valeurSemaine: appelSemaine },
+          { label: "Client", valeur: clients.length, base: prospects.length, baseLabel: "des prospects", valeurAnnee: clientAnnee, valeurMois: clientMois, valeurSemaine: clientSemaine }
+        ])}
+        <div class="appels-detail-toggle" style="margin-top:0.5rem;">
+          <button class="btn btn--ghost" onclick="toggleAfficherPistesBlocage()">${afficherPistesBlocage ? "Masquer" : "Voir"} les pistes de blocage</button>
+        </div>
+        ${afficherPistesBlocage ? pistesBlocageHtml(tauxReponseInfosCalculees) : ""}
       </div>
-    </div>
-
-    <div class="section">
-      <div class="section__head"><span class="section__eyebrow">Appels découverte — profil & pertinence (n=${appelsListe.length})</span></div>
-
-      <div class="viz-row">
-        <div class="viz-block">
-          <div class="viz-block__title">Origine de la demande</div>
-          ${segmentsOrigine.length ? pieChartHtml(segmentsOrigine, 120) : `<p class="muted">Pas encore renseignée sur ces appels.</p>`}
+      <div class="viz-block" style="flex:1 1 300px;">
+        <div class="viz-block__title">Taux de réponse aux messages</div>
+        <p class="muted" style="margin-bottom:0.4rem;">Grisé = n&lt;${SEUIL_FIABLE_TAUX}.</p>
+        ${tauxReponseBarsHtml(tauxReponseInfosCalculees)}
+        <div class="viz-block__title" style="margin-top:0.7rem;font-size:11.5px;">Envoyés cette semaine & régularité</div>
+        <div class="mini-strip">
+          <div class="mini-tile"><div class="mini-tile__value">${relance1Semaine}</div><div class="mini-tile__label">Relances 1</div></div>
+          <div class="mini-tile"><div class="mini-tile__value">${relance2Semaine}</div><div class="mini-tile__label">Relances 2</div></div>
+          <div class="mini-tile"><div class="mini-tile__value">${recontactSemaine}</div><div class="mini-tile__label">Recontacts</div></div>
+          <div class="mini-tile"><div class="mini-tile__value ${regularite.r1.delaiMoyen > 1 ? "stat__value--bordeaux" : ""}">${regularite.r1.pctATemps !== null ? regularite.r1.pctATemps + "%" : "—"}</div><div class="mini-tile__label">R1 à l'heure</div></div>
+          <div class="mini-tile"><div class="mini-tile__value ${regularite.r2.delaiMoyen > 1 ? "stat__value--bordeaux" : ""}">${regularite.r2.pctATemps !== null ? regularite.r2.pctATemps + "%" : "—"}</div><div class="mini-tile__label">R2 à l'heure</div></div>
         </div>
-        <div class="viz-block">
-          <div class="viz-block__title">Offres vendues (global)</div>
-          ${segmentsOffresVendues.length ? pieChartHtml(segmentsOffresVendues, 120) : `<p class="muted">Formule pas encore renseignée sur tes clientes.</p>`}
-        </div>
-      </div>
-
-      ${appelsListe.length ? `
-        <p class="muted" style="margin-top:1.75rem;">Offre à pitcher : Chaud → Sur-mesure, Tiède/Froid → Autonomie. En miroir n'est pas suggérée automatiquement (dépend d'un critère qu'on ne capture pas encore : envie de travailler en couple/avec un·e partenaire).</p>
-        <div class="appels-detail-toggle">
-          <button class="btn btn--ghost" onclick="toggleAfficherDetailAppels()">${afficherDetailAppels ? "Masquer" : "Voir"} le détail (${appelsListe.length})</button>
-        </div>
-        ${afficherDetailAppels ? `
-          <div class="table-wrap" style="margin-top:1rem;">
-            <table>
-              <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Offre à pitcher</th><th>Date</th><th>Résultat</th></tr></thead>
-              <tbody>${appelsRows}</tbody>
-            </table>
+        ${appelsNonSignes.length ? `
+          <div class="viz-block__title" style="margin-top:0.7rem;font-size:11.5px;">Appels découverte (n=${appelsListe.length})</div>
+          <div class="mini-strip" style="margin-top:0.35rem;">
+            <div class="mini-tile"><div class="mini-tile__value stat__value--success">${appelsListe.length - appelsNonSignes.length}</div><div class="mini-tile__label">Ont signé (sur ${appelsListe.length})</div></div>
+            <div class="mini-tile"><div class="mini-tile__value">${Math.round(noShowRateGlobal(data.historiqueAppels) * 100)}%</div><div class="mini-tile__label">No-show</div></div>
+            <div class="mini-tile"><div class="mini-tile__value">${tauxAvecEffectif(appelsListe.length - appelsNonSignes.length, appelsListe.length)}</div><div class="mini-tile__label">Signatures/appels</div></div>
           </div>
         ` : ""}
-      ` : `<p class="muted">Aucun appel découverte enregistré pour le moment.</p>`}
+        ${appelsListe.length ? `
+          <div class="appels-detail-toggle" style="margin-top:0.6rem;">
+            <button class="btn btn--ghost btn--small" onclick="toggleAfficherDetailAppels()">${afficherDetailAppels ? "Masquer" : "Voir"} le détail des appels découverte (${appelsListe.length})</button>
+          </div>
+        ` : `<p class="muted" style="margin-top:0.5rem;">Aucun appel découverte enregistré pour le moment.</p>`}
+      </div>
     </div>
+
+    ${afficherDetailAppels ? `
+      <p class="muted" style="margin-bottom:0.6rem;">Offre à pitcher : Chaud → Sur-mesure, Tiède/Froid → Autonomie. En miroir n'est pas suggérée automatiquement (dépend d'un critère qu'on ne capture pas encore : envie de travailler en couple/avec un·e partenaire).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nom</th><th>Poste</th><th>Température</th><th>Canal</th><th>Origine de l'appel</th><th>Offre à pitcher</th><th>Date</th><th>Résultat</th></tr></thead>
+          <tbody>${appelsRows}</tbody>
+        </table>
+      </div>
+    ` : ""}
+
+    <div class="appels-detail-toggle" style="margin-top:0.4rem;">
+      <button class="btn btn--ghost" onclick="toggleAfficherRetro()">${afficherRetro ? "Masquer" : "Voir"} rétro & expérimentation (origine, offres, test A/B)</button>
+    </div>
+    ${afficherRetro ? `
+      <div class="section section--secondary" style="margin-top:1rem;">
+        <div class="viz-row">
+          <div class="viz-block">
+            <div class="viz-block__title">Origine de la demande</div>
+            ${segmentsOrigine.length ? segmentBarsHtml(segmentsOrigine) : `<p class="muted">Pas encore renseignée sur ces appels.</p>`}
+          </div>
+          <div class="viz-block">
+            <div class="viz-block__title">Offres vendues (global)</div>
+            ${segmentsOffresVendues.length ? segmentBarsHtml(segmentsOffresVendues) : `<p class="muted">Formule pas encore renseignée sur tes clientes.</p>`}
+          </div>
+          <div class="viz-block">
+            ${templateABHtml(statsTemplateABData(prospects))}
+          </div>
+        </div>
+      </div>
+    ` : ""}
   `;
 }
 
