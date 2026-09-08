@@ -1178,7 +1178,7 @@ function relancesADemainHtml(prospects) {
   }).length;
 
   // "Reconnecter" : jamais eu de vraie decision a prendre (pas de phase
-  // d'attente de reponse comme Recontacter) -- juste l'echeance des 6 mois
+  // d'attente de reponse comme Recontacter) -- juste l'echeance du mois
   // (dateRappel) qui declenche l'envoi d'une nouvelle demande de connexion
   // avec note, voir rafaleActionsCandidats (aReconnecter).
   const aReconnecter = prospects.filter(p => p.statut === "Reconnecter" && p.dateRappel && isOverdue(p.dateRappel)).length;
@@ -3197,7 +3197,7 @@ function openTemplatesModal() {
     <textarea id="tpl-recontacter" rows="7" style="${zoneStyle}">${escapeHtml(t["Recontacter"])}</textarea>
     <label style="margin-top:1rem;">Message — Recontacter, avait déjà échangé (reprise de contact ancien)</label>
     <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
-    <label style="margin-top:1rem;">Note de demande de connexion — Reconnecter (suit sans connexion, 6 mois+, ~300 caractères max imposés par LinkedIn)</label>
+    <label style="margin-top:1rem;">Note de demande de connexion — Reconnecter (suit sans connexion, 1 mois+, ~300 caractères max imposés par LinkedIn)</label>
     <textarea id="tpl-reconnecter" rows="4" style="${zoneStyle}">${escapeHtml(t["Reconnecter"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
     <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
@@ -3660,7 +3660,7 @@ function rafaleActionsCandidats() {
 
   // "Reconnecter" : jamais connectee mais suit toujours (voir
   // rafaleConnexionReconnecter) -- pas de phase "envoye, en attente de
-  // reponse" comme Recontacter, un seul stade : l'echeance des 6 mois
+  // reponse" comme Recontacter, un seul stade : l'echeance du mois
   // (dateRappel) depassee declenche l'envoi d'une nouvelle demande de
   // connexion avec note. Une fois "Envoye" (rafaleActionsEnvoyerSuivant),
   // la fiche repasse en "En attente de connexion" et retombe dans le
@@ -3924,7 +3924,7 @@ function renderRafaleConnexionsCard() {
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
       <button class="btn" onclick="rafaleConnexionAcceptee()">1 · A accepté → envoyer le 1er message</button>
       <button class="btn btn--ghost" onclick="rafaleConnexionEnAttente()">2 · Toujours en attente → suivant</button>
-      <button class="btn btn--ghost" onclick="rafaleConnexionReconnecter()">3 · Suit sans connexion → réessayer dans 6 mois</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionReconnecter()">3 · Suit sans connexion → réessayer dans 1 mois</button>
       <button class="btn btn--ghost" onclick="rafaleConnexionSupprimer()">4 · Supprimer (ne suit pas non plus)</button>
     </div>
     <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3 / 4, Retour arrière = précédent, Échap = quitter.</p>
@@ -4011,15 +4011,17 @@ function rafaleConnexionEnAttente() {
 // Reclassement "Suit sans connexion" (demande de Marie le 08/09/2026) : une
 // demande de connexion jamais acceptee ne veut pas dire un contact perdu si
 // la personne suit quand meme Marie -- plutot que de supprimer, on met la
-// fiche de cote 6 mois (meme duree que "Recontacter", SEUIL_RECONTACTER_JOURS
-// cote Code.gs) pour retenter une demande de connexion avec note a
+// fiche de cote 1 mois (delai reduit de 6 a 1 mois le 08/09/2026, a la
+// demande de Marie -- initialement aligne sur "Recontacter"/
+// SEUIL_RECONTACTER_JOURS cote Code.gs, mais Marie prefere retenter plus
+// vite pour ce cas) pour retenter une demande de connexion avec note a
 // l'echeance. Pas de confirm() ici (contrairement a Supprimer) : reclassement
 // reversible, pas de perte de donnees.
 async function rafaleConnexionReconnecter() {
   const p = rafaleQueue[rafaleIndex];
-  const dans6Mois = new Date(today0().getTime());
-  dans6Mois.setMonth(dans6Mois.getMonth() + 6);
-  if (!(await updateField(p.ligne, "dateRappel", dateToIso(dans6Mois)))) return;
+  const dans1Mois = new Date(today0().getTime());
+  dans1Mois.setMonth(dans1Mois.getMonth() + 1);
+  if (!(await updateField(p.ligne, "dateRappel", dateToIso(dans1Mois)))) return;
   if (!(await updateField(p.ligne, "statut", "Reconnecter"))) return;
   rafaleIndex++;
   renderRafaleConnexionsCard();
