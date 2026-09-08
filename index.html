@@ -221,7 +221,6 @@ select.statut-select {
 select.statut-select:focus { outline: 1.5px solid var(--bordeaux); }
 .st-neutral { background: #f0f0f0; color: #666; }
 .st-connexion { background: #e3edfa; color: #2f5fa8; }
-.st-reprise { background: #e2f3f0; color: #1c7c6e; }
 .st-r1 { background: var(--bordeaux-pale); color: var(--bordeaux); }
 .st-r2 { background: var(--bordeaux); color: #fff; }
 .st-conversation { background: var(--amber-pale); color: var(--amber); }
@@ -547,25 +546,27 @@ Si tu as quelques minutes à m'accorder, ça me ferait plaisir d'en savoir un pe
 
 Au plaisir de te lire, je te souhaite une belle fin de semaine.
 Marie`,
-  // "Ancien échange" (a déjà répondu au 1er message, échangé quelques
-  // messages, puis silence) -- texte réel de Marie, remplace le 31/08 un
-  // brouillon jamais validé par elle (voir "Recontacter" ci-dessous, même
-  // remplacement).
-  "Reprise de contact": `Hello {prenom} 😊
-Je voulais te partager une actualité : je viens de sortir un nouvel outil, le programme AIME, pour mieux comprendre ses schémas réactionnels dans la relation de couple.
-
-Au passage, je me souviens que tu m'avais dit suivre mon contenu à l'époque, je suis curieuse de savoir si ça résonne toujours autant pour toi, ou si les choses ont évolué de ton côté depuis ?`,
-  // Distinct de "Reprise de contact" (relance d'une conversation qui a
-  // deja eu lieu) : "Recontacter" s'adresse a un contact reclasse froid il
-  // y a longtemps (6 mois+, voir SEUIL_RECONTACTER_JOURS cote Code.gs) sans
-  // jamais avoir vraiment echange -- garde un ton plus proche du 1er
-  // message que d'une reprise de fil. "Aucun échange" -- texte reel de
-  // Marie, remplace le 31/08 le brouillon ajoute le 21/08 (jamais valide
-  // par elle).
+  // "Recontacter" s'adresse a un contact reclasse froid il y a longtemps
+  // (6 mois+, voir SEUIL_RECONTACTER_JOURS cote Code.gs) sans jamais avoir
+  // vraiment echange -- garde un ton proche du 1er message. "Aucun echange"
+  // -- texte reel de Marie, remplace le 31/08 le brouillon ajoute le 21/08
+  // (jamais valide par elle).
   "Recontacter": `Hello {prenom} 😊
 Je voulais te partager une actualité : je viens de sortir un nouvel outil, le programme AIME, pour mieux comprendre ses schémas réactionnels dans la relation de couple.
 
 Au passage, je suis curieuse : qu'est-ce qui t'avait donné envie de me suivre à l'époque : mon contenu, ou quelque chose de plus personnel ?`,
+  // Variante de "Recontacter" pour un contact avec qui Marie avait deja eu un
+  // vrai echange par le passe (le champ prospect "dejaEchange", coche via
+  // Rafale : trier -- voir rafaleTriRepriseDeContact -- determine laquelle
+  // des deux copier, voir templateKeyPourEnvoi). Anciennement un statut a
+  // part ("Reprise de contact"), fusionne le 08/09/2026 a la demande de
+  // Marie : les deux cas finissent tous les deux "a recontacter", inutile de
+  // les distinguer en statut/stats separes tant que le bon texte part quand
+  // meme automatiquement. Texte reel de Marie, inchange depuis sa creation.
+  "Reprise de contact": `Hello {prenom} 😊
+Je voulais te partager une actualité : je viens de sortir un nouvel outil, le programme AIME, pour mieux comprendre ses schémas réactionnels dans la relation de couple.
+
+Au passage, je me souviens que tu m'avais dit suivre mon contenu à l'époque, je suis curieuse de savoir si ça résonne toujours autant pour toi, ou si les choses ont évolué de ton côté depuis ?`,
   // Note jointe a une NOUVELLE demande de connexion (pas un message normal --
   // limite LinkedIn ~300 caracteres) pour un contact qui n'avait jamais
   // accepte la premiere demande mais suit toujours Marie (voir statut
@@ -576,14 +577,13 @@ Marie 🌞`
 };
 
 const STATUT_OPTIONS = [
-  "Nouveau", "À traiter", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation",
+  "Nouveau", "À traiter", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation",
   "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter", "Reconnecter"
 ];
 const STATUT_CLASS = {
   "Nouveau": "st-neutral",
   "À traiter": "st-a-traiter",
   "En attente de connexion": "st-connexion",
-  "Reprise de contact": "st-reprise",
   "Première relance": "st-r1",
   "Deuxième relance": "st-r2",
   "En conversation": "st-conversation",
@@ -767,7 +767,6 @@ function nextRelance(p) {
 // classements rapides proposes (voir renderProspectsTable / classerProspect).
 const DECISION_CONFIG = {
   "Deuxième relance": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
-  "Reprise de contact": { dateChamp: "dateEntreeStatutRelance", delaiJours: 7, boutons: ["Pas maintenant", "Hors cible"], libelle: j => `À décider (${j}j sans réponse)` },
   "Appel découverte": { dateChamp: "dateAppelDecouverte", delaiJours: 1, boutons: ["Devient cliente", "Pas maintenant", "Hors cible"], libelle: j => `À décider (appel il y a ${j}j)` },
   // Verifie regulierement qu'une conversation "active" l'est encore -- 3
   // options (pas juste "Pas maintenant") car une conversation qui traine peut
@@ -780,8 +779,8 @@ const DECISION_CONFIG = {
   // plus disparaitre 30 jours sans laisser de trace (voir
   // rafaleActionsEnvoyerSuivant) -- des l'envoi, dateEnvoiRecontacte est
   // tamponnee, et la fiche remonte "a decider" au bout de 7 jours si elle n'a
-  // pas ete reclassee entre-temps (meme delai que Deuxieme relance/Reprise de
-  // contact, pour rester coherent).
+  // pas ete reclassee entre-temps (meme delai que Deuxieme relance, pour
+  // rester coherent).
   "Recontacter": { dateChamp: "dateEnvoiRecontacte", delaiJours: 7, boutons: ["En conversation", "Pas maintenant", "Hors cible"], libelle: j => `À décider (message de recontact envoyé il y a ${j}j)` }
 };
 function joursEcoules(dateStr) {
@@ -1062,8 +1061,8 @@ function messageTemplatesActuels() {
     "Nouveau": nouveauTexte,
     "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
     "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"],
-    "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"],
     "Recontacter": obj.templateRecontacter || DEFAULT_MESSAGE_TEMPLATES["Recontacter"],
+    "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"],
     "Reconnecter": obj.templateReconnecter || DEFAULT_MESSAGE_TEMPLATES["Reconnecter"]
   };
 }
@@ -1074,6 +1073,12 @@ function messageTemplatesActuels() {
 // quand meme proposer le texte de Premiere relance, pas re-proposer l'accroche.
 function templateKeyPourEnvoi(p) {
   if (p.statut === "Nouveau" && p.date1erMessage) return "Première relance";
+  // "Recontacter" recouvre deux nuances depuis le 08/09/2026 (voir champ
+  // prospect "dejaEchange", coche via Rafale : trier -- rafaleTriRepriseDeContact) :
+  // un contact jamais reellement echange (texte "Recontacter") ou un contact
+  // avec qui Marie avait deja eu un vrai echange par le passe (texte "Reprise
+  // de contact", ancien statut a part avant leur fusion).
+  if (p.statut === "Recontacter" && p.dejaEchange) return "Reprise de contact";
   return p.statut;
 }
 // Nom cliquable, ouvre la fiche historique (openHistoriqueModal) -- souligne
@@ -1099,12 +1104,10 @@ function rappelsADemainHtml(prospects, obj) {
     })
     .sort((a, b) => parseFrDate(a.dateAppelDecouverte) - parseFrDate(b.dateAppelDecouverte));
   const appelADecider = prospects.filter(p => p.statut === "Appel découverte" && estADecider(p));
-  const repriseADecider = prospects.filter(p => p.statut === "Reprise de contact" && estADecider(p))
-    .sort((a, b) => parseFrDate(a.dateEntreeStatutRelance) - parseFrDate(b.dateEntreeStatutRelance));
   const deuxiemeADecider = prospects.filter(p => p.statut === "Deuxième relance" && estADecider(p))
     .sort((a, b) => parseFrDate(a.dateEntreeStatutRelance) - parseFrDate(b.dateEntreeStatutRelance));
 
-  if (!upcoming.length && !appelADecider.length && !repriseADecider.length && !deuxiemeADecider.length) {
+  if (!upcoming.length && !appelADecider.length && !deuxiemeADecider.length) {
     return `<p class="muted">Rien pour l'instant.</p>`;
   }
 
@@ -1132,12 +1135,6 @@ function rappelsADemainHtml(prospects, obj) {
       `).join("")}</div>` : ""}
     </div>` : "";
 
-  const groupeReprise = repriseADecider.length ? `
-    <div class="rappel-groupe" style="margin-top:0.75rem;">
-      <p class="muted" style="margin-bottom:0.4rem;"><b>Reprise de contact J+7</b></p>
-      <div class="rappels-list">${repriseADecider.map(p => `<div class="rappel-item"><span>${nomFicheHtml(p)} — sans réponse depuis ${joursEcoules(p.dateEntreeStatutRelance)}j</span></div>`).join("")}</div>
-    </div>` : "";
-
   const groupeDeuxieme = deuxiemeADecider.length ? `
     <div class="rappel-groupe" style="margin-top:0.75rem;">
       <div class="rappel-item rappel-item--block">
@@ -1146,7 +1143,7 @@ function rappelsADemainHtml(prospects, obj) {
       </div>
     </div>` : "";
 
-  return groupeAppel + groupeReprise + groupeDeuxieme;
+  return groupeAppel + groupeDeuxieme;
 }
 // Recap par categories (nombres, pas de noms) -- demande de Marie le
 // 31/08/2026 : l'ancienne version (liste de prenoms limitee a Relance 1/2 en
@@ -1172,8 +1169,6 @@ function relancesADemainHtml(prospects) {
     return !!(r && isOverdue(r));
   }).length;
 
-  const repriseAEnvoyer = prospects.filter(p => p.statut === "Reprise de contact" && !p.date1erMessage).length;
-
   const enConversation = prospects.filter(p => p.statut === "En conversation" && estADecider(p)).length;
 
   const aRecontacter = prospects.filter(p => {
@@ -1192,7 +1187,6 @@ function relancesADemainHtml(prospects) {
     ["premier message à envoyer", premierMessage],
     ["relance 1 à envoyer", relance1],
     ["relance 2 à envoyer", relance2],
-    ["reprise de contact à envoyer", repriseAEnvoyer],
     ["en conversation à statuer", enConversation],
     ["à recontacter", aRecontacter],
     ["à reconnecter (nouvelle demande)", aReconnecter],
@@ -1222,7 +1216,7 @@ async function marquerRelanceEnvoyee(ligne) {
   return await updateField(ligne, "statut", "Deuxième relance");
 }
 // Classement en un clic depuis le tag "À décider" (J+7 sans réponse sur
-// Deuxième relance / Reprise de contact) -- voir estADecider().
+// Deuxième relance) -- voir estADecider().
 async function classerProspect(ligne, nouveauStatut) {
   // Repasser en "Recontacter" (depuis "En conversation" par ex.) doit
   // redemarrer un cycle propre : sans ca, un dateEnvoiRecontacte laisse par
@@ -1654,7 +1648,7 @@ let afficherATraiter = false;
 let afficherDetailAppels = false;
 let afficherPistesBlocage = false;
 let filtreStatut = "";
-const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Reconnecter", "Hors cible", "Pas maintenant", "À traiter"];
+const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Reconnecter", "Hors cible", "Pas maintenant", "À traiter"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // Hierarchie d'attention par defaut (sans clic sur "trier") : ce que Marie doit
 // voir tous les jours remonte, ce qui ne demande pas d'action reste discret en
@@ -1664,7 +1658,7 @@ const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // relegues en bas, voir renderProspectsSection) -- pas besoin d'eux ici.
 const STATUT_PRIORITE = [
   "Appel découverte", "En attente de paiement",
-  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Reconnecter", "Client"
+  "Nouveau", "En attente de connexion", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Reconnecter", "Client"
 ];
 
 let prospectSort = null; // { champ: 'statut' | 'temperature', dir: 1 | -1 }
@@ -3199,10 +3193,10 @@ function openTemplatesModal() {
     <textarea id="tpl-r1" rows="4" style="${zoneStyle}">${escapeHtml(t["Première relance"])}</textarea>
     <label style="margin-top:1rem;">Message — Deuxième relance</label>
     <textarea id="tpl-r2" rows="4" style="${zoneStyle}">${escapeHtml(t["Deuxième relance"])}</textarea>
-    <label style="margin-top:1rem;">Message — Reprise de contact</label>
-    <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
-    <label style="margin-top:1rem;">Message — Recontacter (contact froid, 6 mois+)</label>
+    <label style="margin-top:1rem;">Message — Recontacter, jamais échangé (contact froid, 6 mois+)</label>
     <textarea id="tpl-recontacter" rows="7" style="${zoneStyle}">${escapeHtml(t["Recontacter"])}</textarea>
+    <label style="margin-top:1rem;">Message — Recontacter, avait déjà échangé (reprise de contact ancien)</label>
+    <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
     <label style="margin-top:1rem;">Note de demande de connexion — Reconnecter (suit sans connexion, 6 mois+, ~300 caractères max imposés par LinkedIn)</label>
     <textarea id="tpl-reconnecter" rows="4" style="${zoneStyle}">${escapeHtml(t["Reconnecter"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
@@ -3233,8 +3227,8 @@ async function submitTemplates() {
       templateNouveauActif: actifEl ? actifEl.value : DEFAULT_TEMPLATE_NOUVEAU_ACTIF,
       templatePremiereRelance: document.getElementById("tpl-r1").value,
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
-      templateRepriseContact: document.getElementById("tpl-reprise").value,
       templateRecontacter: document.getElementById("tpl-recontacter").value,
+      templateRepriseContact: document.getElementById("tpl-reprise").value,
       templateReconnecter: document.getElementById("tpl-reconnecter").value,
       templateRappel: document.getElementById("tpl-rappel").value
     });
@@ -3502,10 +3496,20 @@ async function rafaleTriHorsCible() {
   rafaleIndex++;
   renderRafaleTriCard();
 }
+// Contact ancien avec qui Marie avait deja eu un vrai echange (par
+// opposition a "Jamais contacte") -- classe directement en "Recontacter"
+// (statut unique, demande de Marie le 08/09/2026, voir templateKeyPourEnvoi)
+// plutot qu'un statut "Reprise de contact" a part comme avant leur fusion.
+// dejaEchange coche pour que le bon texte se copie automatiquement plus tard,
+// dateRappel posee a aujourd'hui pour que la fiche remonte immediatement dans
+// Rafale : actions (meme comportement immediat que l'ancien statut a part,
+// qui apparaissait sans delai des le tri) plutot que dans plusieurs mois.
 async function rafaleTriRepriseDeContact() {
   const p = rafaleQueue[rafaleIndex];
-  p.statut = "Reprise de contact";
-  if (!(await updateField(p.ligne, "statut", "Reprise de contact"))) return;
+  if (!(await updateField(p.ligne, "dejaEchange", "1"))) return;
+  if (!(await updateField(p.ligne, "dateRappel", dateToIso(new Date())))) return;
+  p.statut = "Recontacter";
+  if (!(await updateField(p.ligne, "statut", "Recontacter"))) return;
   rafaleIndex++;
   renderRafaleTriCard();
 }
@@ -3600,7 +3604,7 @@ function urgencePourActions(p) {
   if (p.statut === "Recontacter" || p.statut === "Reconnecter") return parseFrDate(p.dateRappel) || today0();
   const r = nextRelance(p);
   if (r) return parseFrDate(r);
-  return today0(); // Reprise de contact jamais envoyee : pas de date naturelle
+  return today0();
 }
 // File priorisee par groupes (demande de Marie le 31/08/2026 : l'ancien tri
 // unique par urgencePourActions melangeait toutes les categories par date,
@@ -3611,10 +3615,10 @@ function urgencePourActions(p) {
 //     premiers messages", qui reste disponible a part pour blitzer
 //     uniquement ce stock).
 //  2. Cartes d'envoi de la famille "relance" (Premiere/Deuxieme relance en
-//     retard, Reprise de contact jamais envoyee).
+//     retard).
 //  3. Cartes de decision "a statuer" (En conversation, Deuxieme
-//     relance/Reprise de contact/Appel decouverte sans reponse depuis le
-//     delai defini dans DECISION_CONFIG) -- tout sauf Recontacter.
+//     relance/Appel decouverte sans reponse depuis le delai defini dans
+//     DECISION_CONFIG) -- tout sauf Recontacter.
 //  4. Recontacter (jamais encore renvoye et en retard, ou renvoye et sans
 //     reponse depuis 7j).
 // Chaque groupe reste trie en interne par urgencePourActions (le plus en
@@ -3637,7 +3641,6 @@ function rafaleActionsCandidats() {
       const r = nextRelance(p);
       return !!(r && isOverdue(r));
     }
-    if (p.statut === "Reprise de contact" && !p.date1erMessage) return true;
     return false;
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 
@@ -3785,16 +3788,6 @@ async function rafaleActionsEnvoyerSuivant() {
       ok = !!res.ok;
       if (!ok) alert("Échec de l'enregistrement : " + (res.erreur || "erreur inconnue"));
     }
-  } else if (p.statut === "Reprise de contact") {
-    // Reprise de contact : ecrit Date 1er message (jamais utilisee pour cette
-    // etape sinon) plutot que de re-ecrire le Statut -- Code.gs s'en sert pour
-    // tamponner la colonne Y a la date d'envoi REELLE (pas la date du tri), et
-    // ca sert aussi de marqueur "deja envoye" pour ne plus le re-proposer ici
-    // tant que le compte a rebours J+7 n'est pas ecoule (voir rafaleActionsCandidats).
-    // Contrairement a "Nouveau" ci-dessus, son suivi J+7 (DECISION_CONFIG) se
-    // base sur dateEntreeStatutRelance, pas sur nextRelance()/Statut -- pas le
-    // meme bug, ne pas toucher au Statut ici.
-    ok = await updateField(p.ligne, "date1erMessage", dateToIso(new Date()));
   } else if (p.statut === "Recontacter") {
     // Revu le 26/08 : l'ancien comportement (repousser dateRappel de 30 jours
     // "silencieusement") laissait la personne sans suivi si Marie n'avait pas
@@ -3907,6 +3900,19 @@ function renderRafaleConnexionsCard() {
     return;
   }
   const p = rafaleQueue[rafaleIndex];
+  // Copie le message "Nouveau" PAR ANTICIPATION, avant meme d'ouvrir l'onglet
+  // LinkedIn -- demande de Marie le 08/09/2026 : sans ca, le message n'etait
+  // copie qu'au clic sur "1 · A accepte" (voir rafaleConnexionAcceptee),
+  // obligeant un aller-retour CRM -> LinkedIn -> CRM -> LinkedIn (verifier
+  // l'acceptation, puis revenir cliquer, puis retourner coller). Copie ici
+  // AVANT window.open (meme regle que preparerActionEnvoi : window.open
+  // deplace le focus, et navigator.clipboard.writeText() echoue silencieusement
+  // des que le focus a quitte cet onglet) -- le presse-papier est donc deja
+  // pret des l'ouverture du profil, que la demande soit finalement acceptee
+  // ou non (sans consequence si elle ne l'est pas, juste du texte inutilise).
+  const templateAnticipe = messageTemplatesActuels()["Nouveau"] || "";
+  const prenomAnticipe = (p.nom || "").split(" ")[0];
+  copierTexte(templateAnticipe.replace("{prenom}", prenomAnticipe));
   // Ouvre le profil automatiquement, comme les autres rafales -- verifier sur
   // LinkedIn si la demande a ete acceptee est tout l'objet de cette rafale.
   if (p.lien) window.open(p.lien, "_blank");
@@ -3928,10 +3934,12 @@ function renderRafaleConnexionsCard() {
     </div>
   `;
 }
-// Copie le message "Nouveau" (jamais encore envoye a cette personne -- elle
-// attendait la connexion, voir templateKeyPourEnvoi qui utiliserait a tort la
-// cle "En attente de connexion", sans template associe) et bascule la carte
-// en confirmation, meme mecanique en deux temps que renderRafaleActionCard
+// Recopie le message "Nouveau" (deja copie une premiere fois par anticipation
+// dans renderRafaleConnexionsCard, voir plus haut) -- pas redondant en
+// pratique : Marie a pu copier autre chose entre-temps en verifiant le profil
+// sur LinkedIn, cette recopie juste avant qu'elle y retourne coller garantit
+// que le presse-papier est bien a jour. Bascule aussi la carte en
+// confirmation, meme mecanique en deux temps que renderRafaleActionCard
 // (copie -> "Envoyé → suivant"). Copie faite en reponse directe au clic (pas
 // apres un await), donc jamais bloquee par une perte de focus -- voir
 // preparerActionEnvoi pour le meme garde-fou ailleurs.
@@ -3949,8 +3957,26 @@ function rafaleConnexionAcceptee() {
       <button class="btn" onclick="rafaleConnexionAccepteeValider()">Envoyé → suivant (Entrée)</button>
       <button class="btn btn--ghost" onclick="renderRafaleConnexionsCard()">Annuler</button>
     </div>
+    <p class="muted" style="margin-top:1rem;margin-bottom:0.35rem;">En voyant le profil, ce n'est finalement pas une cible -- sans envoyer :</p>
+    <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
+      <button class="btn btn--ghost" onclick="rafaleConnexionAccepteeReclasser('Pas maintenant')">Pas maintenant</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionAccepteeReclasser('Hors cible')">Hors cible</button>
+    </div>
     <div class="modal-actions" style="margin-top:1.5rem;">${boutonPrecedent}<button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button></div>
   `;
+}
+// Reclassement direct depuis l'ecran de confirmation "A accepte" (demande de
+// Marie le 08/09/2026) : le profil ne se revele pas toujours une vraie cible
+// une fois la connexion acceptee et regardee de pres (ex. profil bidon/spam)
+// -- evite de forcer un envoi du 1er message ou un aller-retour par "Annuler"
+// -> les 4 boutons de renderRafaleConnexionsCard, qui n'offrent pas ces deux
+// classements. Meme fonction que le reclassement rapide de Rafale : actions
+// (classerProspect), juste reutilisee ici.
+async function rafaleConnexionAccepteeReclasser(statutCible) {
+  const p = rafaleQueue[rafaleIndex];
+  if (!(await classerProspect(p.ligne, statutCible))) return;
+  rafaleIndex++;
+  renderRafaleConnexionsCard();
 }
 // Meme action serveur que le tout premier message d'un "Nouveau"
 // (updateProspectDejaContacte, voir rafaleActionsEnvoyerSuivant) -- le statut
