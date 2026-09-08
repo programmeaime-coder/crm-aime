@@ -3377,6 +3377,41 @@ function rafalePrecedent() {
     renderRafaleActionCard();
   }
 }
+// Limite le rythme d'ouverture automatique des profils LinkedIn depuis les
+// rafales -- LinkedIn a restreint le compte de Marie le 08/09/2026 ("volume
+// inhabituellement eleve de donnees de profil"). Cause identifiee : chaque
+// carte de rafale ouvrait un profil automatiquement, sans aucun delai, ce qui
+// permet d'enchainer des dizaines de profils en quelques secondes via les
+// raccourcis clavier 1/2/3/4 -- exactement le rythme que LinkedIn detecte
+// comme du scraping. Un espacement minimal entre deux ouvertures AUTOMATIQUES
+// suffit a retrouver un rythme plausible humain ; le lien "Voir le profil
+// LinkedIn" affiche par rafaleEnTeteHtml sur chaque carte reste disponible
+// en secours si une ouverture est sautee -- rien n'est jamais bloque, juste
+// espace.
+let dernierOuvertureProfilRafaleTs = 0;
+const DELAI_MIN_OUVERTURE_PROFIL_MS = 4000;
+function ouvrirProfilRafaleThrottle(p) {
+  if (!p || !p.lien) return;
+  const maintenant = Date.now();
+  if (maintenant - dernierOuvertureProfilRafaleTs < DELAI_MIN_OUVERTURE_PROFIL_MS) return;
+  dernierOuvertureProfilRafaleTs = maintenant;
+  window.open(p.lien, "_blank");
+  compterOuverturesProfilJour();
+}
+// Avertit avant d'approcher le plafond journalier de vues de profil LinkedIn
+// (~500/jour sur un compte gratuit) -- purement indicatif, ne bloque jamais
+// une action, Marie reste seule juge du rythme. Compteur remis a zero chaque
+// jour (cle datee dans localStorage).
+function compterOuverturesProfilJour() {
+  try {
+    const cle = "crmaime_profils_ouverts_" + new Date().toISOString().slice(0, 10);
+    const n = Number(localStorage.getItem(cle) || "0") + 1;
+    localStorage.setItem(cle, String(n));
+    if (n === 300 || n === 400) {
+      alert(`Attention : ${n} profils LinkedIn déjà ouverts aujourd'hui depuis le CRM.\n\nLinkedIn restreint généralement les comptes gratuits au-delà d'environ 500 vues de profil par jour -- pense à faire une pause pour aujourd'hui.`);
+    }
+  } catch (e) { /* localStorage indisponible (navigation privée...) -- pas d'avertissement possible, tant pis */ }
+}
 function rafaleEnTeteHtml(p, total) {
   return `
     <div class="muted" style="margin-bottom:0.5rem;">${rafaleIndex + 1} / ${total}</div>
@@ -3422,7 +3457,7 @@ function renderRafaleTriCard() {
   // Ouvre le profil automatiquement a chaque carte, comme Rafale : actions --
   // evite un clic manuel sur "Voir le profil LinkedIn" pour chacun des ~1900
   // profils a trier.
-  if (p.lien) window.open(p.lien, "_blank");
+  ouvrirProfilRafaleThrottle(p);
   document.getElementById("rafale-content").innerHTML = `
     ${rafaleEnTeteHtml(p, total)}
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
@@ -3598,7 +3633,7 @@ function preparerActionEnvoi(p) {
   const template = messageTemplatesActuels()[cle] || "";
   const prenom = (p.nom || "").split(" ")[0];
   copierTexte(template.replace("{prenom}", prenom));
-  if (p.lien) window.open(p.lien, "_blank");
+  ouvrirProfilRafaleThrottle(p);
 }
 function urgencePourActions(p) {
   if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
@@ -3925,7 +3960,7 @@ function renderRafaleConnexionsCard() {
   const p = rafaleQueue[rafaleIndex];
   // Ouvre le profil automatiquement, comme les autres rafales -- verifier sur
   // LinkedIn si la demande a ete acceptee est tout l'objet de cette rafale.
-  if (p.lien) window.open(p.lien, "_blank");
+  ouvrirProfilRafaleThrottle(p);
   const j = joursEcoules(p.dateAttenteConnexion);
   const depuis = j === null ? "date de la demande inconnue" : `en attente depuis ${j} jour${j > 1 ? "s" : ""}${j >= 21 ? " — 3 semaines dépassées" : ""}`;
   document.getElementById("rafale-content").innerHTML = `
