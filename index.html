@@ -229,6 +229,7 @@ select.statut-select:focus { outline: 1.5px solid var(--bordeaux); }
 .st-attente { background: #c1440e; color: #fff; font-weight: 600; }
 .st-client { background: var(--success-pale); color: var(--success); }
 .st-recontact { background: #eef1f6; color: #5b6b85; }
+.st-reconnect { background: #f3e8f7; color: #7c4a94; }
 .st-non { background: #f0f0f0; color: #999; }
 .st-a-traiter { background: #fdf0d5; color: #a5690a; }
 
@@ -564,12 +565,19 @@ Au passage, je me souviens que tu m'avais dit suivre mon contenu à l'époque, j
   "Recontacter": `Hello {prenom} 😊
 Je voulais te partager une actualité : je viens de sortir un nouvel outil, le programme AIME, pour mieux comprendre ses schémas réactionnels dans la relation de couple.
 
-Au passage, je suis curieuse : qu'est-ce qui t'avait donné envie de me suivre à l'époque : mon contenu, ou quelque chose de plus personnel ?`
+Au passage, je suis curieuse : qu'est-ce qui t'avait donné envie de me suivre à l'époque : mon contenu, ou quelque chose de plus personnel ?`,
+  // Note jointe a une NOUVELLE demande de connexion (pas un message normal --
+  // limite LinkedIn ~300 caracteres) pour un contact qui n'avait jamais
+  // accepte la premiere demande mais suit toujours Marie (voir statut
+  // "Reconnecter" ci-dessous). Texte reel de Marie, remplace le 08/09/2026
+  // le brouillon de Claude jamais valide.
+  "Reconnecter": `Bonjour {prenom}, je vois que tu suis mon contenu depuis quelques temps, alors ça me ferait plaisir qu'on soit connectées.
+Marie 🌞`
 };
 
 const STATUT_OPTIONS = [
   "Nouveau", "À traiter", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation",
-  "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter"
+  "Appel découverte", "En attente de paiement", "Client", "Hors cible", "Pas maintenant", "Recontacter", "Reconnecter"
 ];
 const STATUT_CLASS = {
   "Nouveau": "st-neutral",
@@ -584,7 +592,8 @@ const STATUT_CLASS = {
   "Client": "st-client",
   "Hors cible": "st-non",
   "Pas maintenant": "st-non",
-  "Recontacter": "st-recontact"
+  "Recontacter": "st-recontact",
+  "Reconnecter": "st-reconnect"
 };
 const TEMP_OPTIONS = ["Froid", "Tiède", "Chaud"];
 const CANAL_OPTIONS = ["LinkedIn", "Instagram", "Bouche à oreille", "Autre"];
@@ -1054,7 +1063,8 @@ function messageTemplatesActuels() {
     "Première relance": obj.templatePremiereRelance || DEFAULT_MESSAGE_TEMPLATES["Première relance"],
     "Deuxième relance": obj.templateDeuxiemeRelance || DEFAULT_MESSAGE_TEMPLATES["Deuxième relance"],
     "Reprise de contact": obj.templateRepriseContact || DEFAULT_MESSAGE_TEMPLATES["Reprise de contact"],
-    "Recontacter": obj.templateRecontacter || DEFAULT_MESSAGE_TEMPLATES["Recontacter"]
+    "Recontacter": obj.templateRecontacter || DEFAULT_MESSAGE_TEMPLATES["Recontacter"],
+    "Reconnecter": obj.templateReconnecter || DEFAULT_MESSAGE_TEMPLATES["Reconnecter"]
   };
 }
 // Le Statut nomme deja l'etape EN ATTENTE (voir updateField/date1erMessage et
@@ -1172,6 +1182,12 @@ function relancesADemainHtml(prospects) {
     return !!(!p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel));
   }).length;
 
+  // "Reconnecter" : jamais eu de vraie decision a prendre (pas de phase
+  // d'attente de reponse comme Recontacter) -- juste l'echeance des 6 mois
+  // (dateRappel) qui declenche l'envoi d'une nouvelle demande de connexion
+  // avec note, voir rafaleActionsCandidats (aReconnecter).
+  const aReconnecter = prospects.filter(p => p.statut === "Reconnecter" && p.dateRappel && isOverdue(p.dateRappel)).length;
+
   const lignes = [
     ["premier message à envoyer", premierMessage],
     ["relance 1 à envoyer", relance1],
@@ -1179,6 +1195,7 @@ function relancesADemainHtml(prospects) {
     ["reprise de contact à envoyer", repriseAEnvoyer],
     ["en conversation à statuer", enConversation],
     ["à recontacter", aRecontacter],
+    ["à reconnecter (nouvelle demande)", aReconnecter],
   ].filter(([, n]) => n > 0);
 
   const total = lignes.reduce((sum, [, n]) => sum + n, 0);
@@ -1637,7 +1654,7 @@ let afficherATraiter = false;
 let afficherDetailAppels = false;
 let afficherPistesBlocage = false;
 let filtreStatut = "";
-const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Hors cible", "Pas maintenant", "À traiter"];
+const STATUT_ORDER = ["Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Appel découverte", "En attente de paiement", "Client", "Recontacter", "Reconnecter", "Hors cible", "Pas maintenant", "À traiter"];
 const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // Hierarchie d'attention par defaut (sans clic sur "trier") : ce que Marie doit
 // voir tous les jours remonte, ce qui ne demande pas d'action reste discret en
@@ -1647,7 +1664,7 @@ const TEMP_ORDER = ["Chaud", "Tiède", "Froid", ""];
 // relegues en bas, voir renderProspectsSection) -- pas besoin d'eux ici.
 const STATUT_PRIORITE = [
   "Appel découverte", "En attente de paiement",
-  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Client"
+  "Nouveau", "En attente de connexion", "Reprise de contact", "Première relance", "Deuxième relance", "En conversation", "Recontacter", "Reconnecter", "Client"
 ];
 
 let prospectSort = null; // { champ: 'statut' | 'temperature', dir: 1 | -1 }
@@ -2905,9 +2922,12 @@ function openHistoriqueModal(ligne) {
     // la date qui compte est celle de l'envoi reel, pas l'echeance
     // artificielle qui l'a declenche (voir DECISION_CONFIG["Recontacter"]).
     evenements.push({ label: "Message de recontact envoyé", date: p.dateEnvoiRecontacte, champs: ["dateEnvoiRecontacte"] });
-  } else if ((p.statut === "Pas maintenant" || p.statut === "Recontacter") && p.dateRappel
+  } else if ((p.statut === "Pas maintenant" || p.statut === "Recontacter" || p.statut === "Reconnecter") && p.dateRappel
     && !((Number(p.nbRelances) || 0) === 0 && p.date1erMessage)) {
-    evenements.push({ label: p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter" : "À recontacter", date: p.dateRappel, champs: ["dateRappel"] });
+    const labelRappel = p.statut === "Pas maintenant" ? "Pas maintenant — à recontacter"
+      : p.statut === "Reconnecter" ? "À reconnecter (nouvelle demande de connexion)"
+      : "À recontacter";
+    evenements.push({ label: labelRappel, date: p.dateRappel, champs: ["dateRappel"] });
   }
   // Libelle retravaille le 20/08 (etait "Date de premiere reponse") : pour
   // ~97% des prospects avec une reponse enregistree, cette date vient du
@@ -3183,6 +3203,8 @@ function openTemplatesModal() {
     <textarea id="tpl-reprise" rows="7" style="${zoneStyle}">${escapeHtml(t["Reprise de contact"])}</textarea>
     <label style="margin-top:1rem;">Message — Recontacter (contact froid, 6 mois+)</label>
     <textarea id="tpl-recontacter" rows="7" style="${zoneStyle}">${escapeHtml(t["Recontacter"])}</textarea>
+    <label style="margin-top:1rem;">Note de demande de connexion — Reconnecter (suit sans connexion, 6 mois+, ~300 caractères max imposés par LinkedIn)</label>
+    <textarea id="tpl-reconnecter" rows="4" style="${zoneStyle}">${escapeHtml(t["Reconnecter"])}</textarea>
     <label style="margin-top:1rem;">Message de rappel (bouton "Copier message de rappel", appel découverte)</label>
     <textarea id="tpl-rappel" rows="3" style="${zoneStyle}">${escapeHtml(rappel)}</textarea>
     <p class="muted" style="margin-top:0.75rem;">{prenom} est remplacé automatiquement par le prénom du prospect dans les templates.</p>
@@ -3213,6 +3235,7 @@ async function submitTemplates() {
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
       templateRepriseContact: document.getElementById("tpl-reprise").value,
       templateRecontacter: document.getElementById("tpl-recontacter").value,
+      templateReconnecter: document.getElementById("tpl-reconnecter").value,
       templateRappel: document.getElementById("tpl-rappel").value
     });
   } catch (e) {
@@ -3574,7 +3597,7 @@ function preparerActionEnvoi(p) {
 }
 function urgencePourActions(p) {
   if (estADecider(p)) return parseFrDate(p[DECISION_CONFIG[p.statut].dateChamp]);
-  if (p.statut === "Recontacter") return parseFrDate(p.dateRappel) || today0();
+  if (p.statut === "Recontacter" || p.statut === "Reconnecter") return parseFrDate(p.dateRappel) || today0();
   const r = nextRelance(p);
   if (r) return parseFrDate(r);
   return today0(); // Reprise de contact jamais envoyee : pas de date naturelle
@@ -3632,7 +3655,18 @@ function rafaleActionsCandidats() {
     return !p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel);
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 
-  return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter];
+  // "Reconnecter" : jamais connectee mais suit toujours (voir
+  // rafaleConnexionReconnecter) -- pas de phase "envoye, en attente de
+  // reponse" comme Recontacter, un seul stade : l'echeance des 6 mois
+  // (dateRappel) depassee declenche l'envoi d'une nouvelle demande de
+  // connexion avec note. Une fois "Envoye" (rafaleActionsEnvoyerSuivant),
+  // la fiche repasse en "En attente de connexion" et retombe dans le
+  // circuit normal (Rafale : demandes de connexion).
+  const aReconnecter = currentData.prospects.filter(p => {
+    return p.statut === "Reconnecter" && p.dateRappel && isOverdue(p.dateRappel);
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+
+  return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter, ...aReconnecter];
 }
 function ouvrirRafaleActions() {
   rafaleQueue = rafaleActionsCandidats();
@@ -3688,10 +3722,17 @@ function renderRafaleActionCard() {
     // une fiche en retard").
     const legendeReclassement = p.statut === "Recontacter"
       ? "Reclasser directement, sans envoyer :"
+      : p.statut === "Reconnecter"
+      ? "Reclasser directement, sans renvoyer de demande :"
       : "La personne a déjà répondu, ou n'est pas connectée (fiche pas à jour) :";
+    // "Reconnecter" copie une note de demande de connexion, pas un message
+    // normal (voir DEFAULT_MESSAGE_TEMPLATES["Reconnecter"]) -- libelle adapte
+    // pour ne pas laisser croire qu'un message a ete envoye a quelqu'un qui
+    // n'est pas connecte.
+    const libelleCopie = p.statut === "Reconnecter" ? "Note de connexion" : "Message";
     document.getElementById("rafale-content").innerHTML = `
       ${rafaleEnTeteHtml(p, total)}
-      <p class="muted" style="margin-bottom:1rem;">Message "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
+      <p class="muted" style="margin-bottom:1rem;">${escapeHtml(libelleCopie)} "${escapeHtml(cle)}" copié dans le presse-papier ✓ — profil ouvert dans un nouvel onglet.</p>
       <div class="modal-actions" style="justify-content:flex-start;">
         <button class="btn" onclick="rafaleActionsEnvoyerSuivant()">Envoyé → suivant (Entrée)</button>
       </div>
@@ -3764,6 +3805,16 @@ async function rafaleActionsEnvoyerSuivant() {
     // (voir rafaleActionsCandidats/maybeShowReminderPopup, generiques sur
     // estADecider). dateRappel n'est plus touchee ici.
     ok = await updateField(p.ligne, "dateEnvoiRecontacte", dateToIso(new Date()));
+  } else if (p.statut === "Reconnecter") {
+    // Contrairement a "Recontacter" (qui reste sur place en attendant une
+    // reponse, voir DECISION_CONFIG), une nouvelle demande de connexion
+    // envoyee doit rebasculer la fiche dans le circuit normal des demandes
+    // en attente (meme mecanique que n'importe quelle nouvelle demande) --
+    // elle y retrouvera le meme sort (acceptee -> 1er message, toujours en
+    // attente, ou de nouveau jamais acceptee -> Rafale : demandes de
+    // connexion re-proposera alors "Reconnecter" ou "Supprimer").
+    ok = await updateField(p.ligne, "dateAttenteConnexion", dateToIso(new Date()));
+    if (ok) ok = await updateField(p.ligne, "statut", "En attente de connexion");
   } else {
     ok = await marquerRelanceEnvoyee(p.ligne);
   }
@@ -3867,9 +3918,10 @@ function renderRafaleConnexionsCard() {
     <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap;">
       <button class="btn" onclick="rafaleConnexionAcceptee()">1 · A accepté → envoyer le 1er message</button>
       <button class="btn btn--ghost" onclick="rafaleConnexionEnAttente()">2 · Toujours en attente → suivant</button>
-      <button class="btn btn--ghost" onclick="rafaleConnexionSupprimer()">3 · Supprimer (jamais acceptée)</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionReconnecter()">3 · Suit sans connexion → réessayer dans 6 mois</button>
+      <button class="btn btn--ghost" onclick="rafaleConnexionSupprimer()">4 · Supprimer (ne suit pas non plus)</button>
     </div>
-    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3, Retour arrière = précédent, Échap = quitter.</p>
+    <p class="muted" style="margin-top:0.5rem;">Raccourcis clavier : 1 / 2 / 3 / 4, Retour arrière = précédent, Échap = quitter.</p>
     <div class="modal-actions" style="margin-top:1.5rem;">
       ${boutonPrecedent}
       <button class="btn btn--ghost" onclick="fermerRafale()">Quitter</button>
@@ -3930,14 +3982,32 @@ function rafaleConnexionEnAttente() {
   rafaleIndex++;
   renderRafaleConnexionsCard();
 }
+// Reclassement "Suit sans connexion" (demande de Marie le 08/09/2026) : une
+// demande de connexion jamais acceptee ne veut pas dire un contact perdu si
+// la personne suit quand meme Marie -- plutot que de supprimer, on met la
+// fiche de cote 6 mois (meme duree que "Recontacter", SEUIL_RECONTACTER_JOURS
+// cote Code.gs) pour retenter une demande de connexion avec note a
+// l'echeance. Pas de confirm() ici (contrairement a Supprimer) : reclassement
+// reversible, pas de perte de donnees.
+async function rafaleConnexionReconnecter() {
+  const p = rafaleQueue[rafaleIndex];
+  const dans6Mois = new Date(today0().getTime());
+  dans6Mois.setMonth(dans6Mois.getMonth() + 6);
+  if (!(await updateField(p.ligne, "dateRappel", dateToIso(dans6Mois)))) return;
+  if (!(await updateField(p.ligne, "statut", "Reconnecter"))) return;
+  rafaleIndex++;
+  renderRafaleConnexionsCard();
+}
 // Supprime directement depuis la rafale (demande de Marie le 02/09/2026,
 // pour ne pas devoir rouvrir le tableau Prospects et rechercher la personne
 // une fois reperee ici) -- meme action serveur que le bouton "Suppr." de la
 // table (deleteProspect), voir aussi maybeShowReminderPopup qui suggere deja
-// cette suppression au bout de 3 semaines sans reponse.
+// cette suppression au bout de 3 semaines sans reponse. Reservee aux
+// contacts qui ne suivent plus non plus (voir rafaleConnexionReconnecter
+// pour ceux qui suivent toujours).
 async function rafaleConnexionSupprimer() {
   const p = rafaleQueue[rafaleIndex];
-  if (!confirm(`Supprimer ${p.nom} des prospects ? (demande de connexion jamais acceptée)`)) return;
+  if (!confirm(`Supprimer ${p.nom} des prospects ? (demande de connexion jamais acceptée, ne suit pas non plus)`)) return;
   try {
     await jsonpCall({ action: "deleteProspect", ligne: p.ligne });
   } catch (err) {
@@ -3987,7 +4057,8 @@ document.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rafaleConnexionAccepteeValider(); }
     } else if (e.key === "1") rafaleConnexionAcceptee();
     else if (e.key === "2" || e.key === "Enter") rafaleConnexionEnAttente();
-    else if (e.key === "3") rafaleConnexionSupprimer();
+    else if (e.key === "3") rafaleConnexionReconnecter();
+    else if (e.key === "4") rafaleConnexionSupprimer();
   }
 });
 
