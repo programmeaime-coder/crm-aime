@@ -594,7 +594,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGo
 // audit du 11/09/2026, point deploiement). Cette comparaison permet de
 // detecter un ecart entre le code local et ce qui tourne reellement, sans
 // avoir a rouvrir l'editeur pour verifier.
-const VERSION_ATTENDUE_BACKEND = "2026-09-11a";
+const VERSION_ATTENDUE_BACKEND = "2026-09-11b";
 let alerteVersionAffichee = false;
 function verifierVersionBackend(data) {
   if (alerteVersionAffichee || !data || !data.version || data.version === VERSION_ATTENDUE_BACKEND) return;
@@ -2646,24 +2646,36 @@ function tauxReponseBarsHtml(infos) {
 // juste au-dessus, une reponse tardive apres une relance est comptee sans
 // qu'on puisse prouver qu'elle repond specifiquement au 1er message plutot
 // qu'a la relance -- caveat assume, rappele dans le texte affiche a Marie.
-// Date d'introduction du template B -- avant cette date, seul le template A
-// existait. Demande de Marie le 20/08 : le scan de messagerie ne tague la
+// Journal des bascules A/B (onglet HistoriqueTemplateActif, une ligne par
+// changement du template "actif" dans la modale Template -- cf.
+// journaliserChangementTemplateActif/ongletHistoriqueTemplates, Code.gs).
+// Remplace l'ancienne constante fixe DATE_INTRO_TEMPLATE_B (18/08) : demande
+// de Marie le 11/09/2026, qui ne veut plus avoir a cocher une case A/B a la
+// main sur chaque fiche -- cocher le template actif dans la modale Template
+// doit suffire a classer automatiquement tous les 1ers messages futurs,
+// indefiniment, a chaque nouvelle bascule. Le scan de messagerie ne tague la
 // variante (colonne AB) que quand le DERNIER message envoye est encore le
 // 1er (stade 0, voir matcherReponses/Code.gs) -- des qu'une relance part,
-// cette info n'est plus jamais ecrite, alors qu'un 1er message envoye avant
-// le lancement de B ne peut logiquement etre que "A", relance ou pas.
-// Deduction par date plutot que par Nb relances : reste correcte indefiniment
-// (contrairement a un seuil "deja relance = A", qui deviendrait faux des que
-// des destinataires du template B commenceront eux-memes a atteindre la
-// relance 1, ~J+5 apres son lancement).
-const DATE_INTRO_TEMPLATE_B = new Date(2026, 7, 18);
+// cette info n'est plus jamais ecrite ; la deduction par date via ce journal
+// reste correcte indefiniment, y compris pour ces prospects-la. Le journal
+// est seede cote serveur avec l'historique reel connu avant sa creation
+// (A seul jusqu'au 18/08/2026, puis B), donc les stats passees restent
+// coherentes sans reprise manuelle.
+function variantePourDateHistorique(date, historique) {
+  if (!date || !historique || !historique.length) return null;
+  let meilleure = null;
+  historique.forEach(entree => {
+    const d = parseFrDate(entree.date);
+    if (d && d <= date && (!meilleure || d > meilleure.date)) meilleure = { date: d, variante: entree.variante };
+  });
+  return meilleure ? meilleure.variante : null;
+}
 function variantePourStats(p) {
   if (p.templateVarianteManuelle === "A" || p.templateVarianteManuelle === "B") return p.templateVarianteManuelle;
   if (p.templateVariante === "Nouveau") return "B";
   if (p.templateVariante === "Ancien") return "A";
   const dPremierMessage = parseFrDate(p.date1erMessage);
-  if (dPremierMessage && dPremierMessage < DATE_INTRO_TEMPLATE_B) return "A";
-  return null;
+  return variantePourDateHistorique(dPremierMessage, currentData && currentData.historiqueTemplates);
 }
 function statsTemplateABData(prospects) {
   const contactes = prospects.filter(p => !!p.date1erMessage || (Number(p.nbRelances) || 0) > 0);
@@ -3484,11 +3496,17 @@ async function submitAddProspect() {
   loadData(true);
 }
 
+// Valeur de templateNouveauActif au moment de l'ouverture de la modale --
+// comparee dans submitTemplates a la valeur cochee au moment d'enregistrer,
+// pour ne demander confirmation que si Marie a reellement bascule de
+// template (pas a chaque enregistrement des textes de templates).
+let templateActifOriginal = null;
 function openTemplatesModal() {
   const obj = (currentData.objectifs) || {};
   const nouveauA = obj.templateNouveau || DEFAULT_MESSAGE_TEMPLATES["Nouveau"];
   const nouveauB = obj.templateNouveauB || DEFAULT_MESSAGE_TEMPLATES["Nouveau B"];
   const actif = obj.templateNouveauActif || DEFAULT_TEMPLATE_NOUVEAU_ACTIF;
+  templateActifOriginal = actif;
   const t = messageTemplatesActuels();
   const rappel = (currentData.objectifs && currentData.objectifs.templateRappel) || DEFAULT_TEMPLATE_RAPPEL;
   const zoneStyle = "width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:0.5rem;border:0.5px solid var(--border);margin-top:0.35rem;";
@@ -3531,6 +3549,17 @@ function openTemplatesModal() {
   document.getElementById("modal-overlay").hidden = false;
 }
 async function submitTemplates() {
+  const actifEl = document.querySelector('input[name="tpl-nouveau-actif"]:checked');
+  const nouvelActif = actifEl ? actifEl.value : DEFAULT_TEMPLATE_NOUVEAU_ACTIF;
+  // Bascule de template detectee (vs valeur a l'ouverture de la modale) --
+  // confirmation demandee par Marie le 11/09/2026 : a partir de la, TOUS les
+  // 1ers messages futurs seront comptes automatiquement dans ce groupe-la
+  // (Test A/B), sans plus rien avoir a cocher par fiche. cf.
+  // journaliserChangementTemplateActif (Code.gs) et variantePourDateHistorique.
+  if (templateActifOriginal !== null && nouvelActif !== templateActifOriginal) {
+    const label = nouvelActif === "B" ? "Template B (nouveau)" : "Template A (ancien)";
+    if (!confirm(`Tu bascules le 1er message sur ${label}.\n\nÀ partir de maintenant et jusqu'au prochain changement, tous les nouveaux 1ers messages seront comptés comme "${nouvelActif}" dans le Test A/B des stats.\n\nConfirmer ?`)) return;
+  }
   const btn = document.getElementById("tpl-submit-btn");
   const errorEl = document.getElementById("tpl-error");
   errorEl.style.display = "none";
@@ -3538,12 +3567,11 @@ async function submitTemplates() {
   btn.textContent = "Enregistrement...";
   let res;
   try {
-    const actifEl = document.querySelector('input[name="tpl-nouveau-actif"]:checked');
     res = await jsonpCall({
       action: "setObjectifs",
       templateNouveau: document.getElementById("tpl-nouveau-a").value,
       templateNouveauB: document.getElementById("tpl-nouveau-b").value,
-      templateNouveauActif: actifEl ? actifEl.value : DEFAULT_TEMPLATE_NOUVEAU_ACTIF,
+      templateNouveauActif: nouvelActif,
       templatePremiereRelance: document.getElementById("tpl-r1").value,
       templateDeuxiemeRelance: document.getElementById("tpl-r2").value,
       templateRecontacter: document.getElementById("tpl-recontacter").value,
@@ -3724,7 +3752,7 @@ const SEUIL_PAUSE_OBLIGATOIRE_PROFILS = 25;
 const DUREE_PAUSE_OBLIGATOIRE_MS = 20 * 60 * 1000; // 20 min -- milieu de la fourchette 15-30 demandee par Marie
 let compteurBurstOuverturesProfil = 0;
 let pauseOuvertureProfilJusqua = 0;
-function ouvrirProfilRafaleThrottle(p) {
+async function ouvrirProfilRafaleThrottle(p) {
   if (OUVERTURE_AUTO_PROFIL_RAFALE_DESACTIVEE) return;
   if (!p || !p.lien) return;
   const maintenant = Date.now();
@@ -3734,6 +3762,18 @@ function ouvrirProfilRafaleThrottle(p) {
     compteurBurstOuverturesProfil = 0;
   }
   if (maintenant - dernierOuvertureProfilRafaleTs < DELAI_MIN_OUVERTURE_PROFIL_MS) return;
+  // Verifie le compteur PARTAGE cote serveur (Code.gs, voir pingLinkedin_ /
+  // SEUIL_LINKEDIN_JOUR) -- seul point commun avec bookmarklet-crm-auto.js
+  // (origine linkedin.com, ne peut pas partager un compteur cote client avec
+  // cette page sur GitHub Pages). Ajoute le 11/09/2026 (audit securite,
+  // demande explicite de Marie) suite a une 2e restriction du compte malgre
+  // les garde-fous locaux ci-dessus.
+  try {
+    const res = await jsonpCall({ action: "pingLinkedin" });
+    if (!res || !res.ok || res.bloque) return; // bloque cote serveur -- lien manuel "Voir le profil LinkedIn" toujours dispo sur la carte
+  } catch (err) {
+    return; // pas de reponse -- on prefere ne pas ouvrir plutot que de deviner
+  }
   dernierOuvertureProfilRafaleTs = maintenant;
   window.open(p.lien, "_blank");
   compteurBurstOuverturesProfil++;
