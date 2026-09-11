@@ -1617,8 +1617,8 @@ function renderDashboard(data) {
       <div class="section__head">
         <span class="section__eyebrow">Rappels & Relances</span>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn" onclick="ouvrirRafaleActions()">Rafale : actions</button>
-          <button class="btn btn--ghost" onclick="ouvrirRafaleConnexions()">Rafale : demandes de connexion</button>
+          <button class="btn" ${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "disabled" : ""} title="${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "Désactivé temporairement (restriction LinkedIn) — voir RAFALE_DESACTIVEE_TEMPORAIREMENT dans le code" : ""}" onclick="ouvrirRafaleActions()">Rafale : actions</button>
+          <button class="btn btn--ghost" ${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "disabled" : ""} title="${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "Désactivé temporairement (restriction LinkedIn) — voir RAFALE_DESACTIVEE_TEMPORAIREMENT dans le code" : ""}" onclick="ouvrirRafaleConnexions()">Rafale : demandes de connexion</button>
         </div>
       </div>
       <div class="rappels-relances-grid">
@@ -1901,7 +1901,7 @@ function renderProspectsSection(prospects) {
           ${btnNouveau}${btnHorsCible}${btnATraiter}
         </div>
         <div class="toolbar__row toolbar__row--actions">
-          <button class="btn btn--ghost" onclick="ouvrirRafaleTri()">Rafale : trier</button>
+          <button class="btn btn--ghost" ${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "disabled" : ""} title="${RAFALE_DESACTIVEE_TEMPORAIREMENT ? "Désactivé temporairement (restriction LinkedIn) — voir RAFALE_DESACTIVEE_TEMPORAIREMENT dans le code" : ""}" onclick="ouvrirRafaleTri()">Rafale : trier</button>
           <button class="btn btn--ghost" onclick="openTemplatesModal()">Template</button>
           <button class="btn" onclick="openAddProspectModal()">+ Ajouter un prospect</button>
         </div>
@@ -3614,6 +3614,13 @@ async function submitAddClient() {
 // specifiquement les demandes de connexion en attente -- volontairement PAS
 // integre a rafaleActionsCandidats/DECISION_CONFIG, voir ouvrirRafaleConnexions
 // plus bas.
+// Coupure temporaire demandee par Marie le 11/09/2026 : compte LinkedIn a
+// nouveau restreint quelques heures malgre les garde-fous du 08/09/2026
+// (throttle/pause/avertissement ci-dessous) -- par prudence, elle prefere
+// desactiver entierement les 3 boutons rafale (actions/connexions/tri) le
+// temps de rattraper son retard manuellement (profils/conversations ouverts
+// a la main, sans automatisation). Pour reactiver : repasser ce flag a false.
+const RAFALE_DESACTIVEE_TEMPORAIREMENT = true;
 let rafaleMode = null; // "tri" | "actions" | "connexions"
 let rafaleQueue = [];
 let rafaleIndex = 0;
@@ -3723,6 +3730,7 @@ function rafaleEnTeteHtml(p, total) {
 // ─── Rafale 1 : tri des "Nouveau"/"À traiter" ambigus ───
 
 function ouvrirRafaleTri() {
+  if (RAFALE_DESACTIVEE_TEMPORAIREMENT) { alert("Rafale désactivée temporairement (restriction LinkedIn du 11/09/2026)."); return; }
   // !p.trieRafale exclut les "Jamais contacté" deja confirmes lors d'une
   // session precedente -- pour un "Nouveau", ce bouton ne change pas le
   // Statut (voir rafaleTriJamaisContacte), donc sans ce marqueur ils
@@ -4007,6 +4015,7 @@ function rafaleActionsCandidats() {
   return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter, ...aReconnecter];
 }
 function ouvrirRafaleActions() {
+  if (RAFALE_DESACTIVEE_TEMPORAIREMENT) { alert("Rafale désactivée temporairement (restriction LinkedIn du 11/09/2026)."); return; }
   rafaleQueue = rafaleActionsCandidats();
   if (rafaleQueue.length === 0) { alert("Rien à faire pour l'instant : tout est à jour."); return; }
   rafaleMode = "actions";
@@ -4200,6 +4209,7 @@ async function rafaleActionsDecisionClasser(statutCible) {
 // toujours en attente (le compteur des 3 semaines n'est donc jamais
 // perturbe par un simple passage dans cette rafale).
 function ouvrirRafaleConnexions() {
+  if (RAFALE_DESACTIVEE_TEMPORAIREMENT) { alert("Rafale désactivée temporairement (restriction LinkedIn du 11/09/2026)."); return; }
   rafaleQueue = currentData.prospects
     .filter(p => p.statut === "En attente de connexion")
     .slice()
