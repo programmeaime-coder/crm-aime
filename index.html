@@ -826,6 +826,48 @@ function deconnexion() {
   showLockScreen();
 }
 
+// Deconnexion automatique apres inactivite -- ajoutee le 11/09/2026 (demande
+// de Marie, en complement du bouton manuel ci-dessus). Fermer l'ordinateur
+// (mise en veille) revient au meme qu'une longue inactivite du point de vue
+// du navigateur : aucun evenement JS ne se declenche pendant la veille, donc
+// un seul mecanisme base sur "depuis combien de temps plus personne n'a
+// touche la page" couvre les deux cas -- pas besoin (et pas possible de
+// maniere fiable) de detecter la fermeture du capot specifiquement.
+const SEUIL_INACTIVITE_MS = 4 * 60 * 60 * 1000; // 4h -- change juste ce chiffre si besoin d'une autre duree
+const DERNIERE_ACTIVITE_KEY = "crmAimeDerniereActivite";
+function enregistrerActivite() {
+  localStorage.setItem(DERNIERE_ACTIVITE_KEY, String(Date.now()));
+}
+function inactifDepuisTropLongtemps() {
+  const derniere = Number(localStorage.getItem(DERNIERE_ACTIVITE_KEY)) || 0;
+  return derniere > 0 && (Date.now() - derniere) > SEUIL_INACTIVITE_MS;
+}
+function messageSessionExpireeInactivite() {
+  return `Session expirée après ${Math.round(SEUIL_INACTIVITE_MS / 3600000)}h d'inactivité, retape le mot de passe.`;
+}
+// Throttle a 30s : pas la peine de reecrire le localStorage a chaque pixel
+// de mouvement de souris.
+let derniereEcritureActivite = 0;
+function surActiviteUtilisateur() {
+  const maintenant = Date.now();
+  if (maintenant - derniereEcritureActivite < 30000) return;
+  derniereEcritureActivite = maintenant;
+  enregistrerActivite();
+}
+["mousemove", "keydown", "click", "touchstart", "scroll"].forEach((evt) => {
+  document.addEventListener(evt, surActiviteUtilisateur, { passive: true });
+});
+// Verification periodique pendant que l'onglet reste ouvert SANS recharger
+// la page (ex. laisse allume sur le bureau, capot ouvert) -- sans ca,
+// l'expiration ne serait detectee qu'au prochain chargement de loadData().
+setInterval(() => {
+  if (getStoredPassword() && inactifDepuisTropLongtemps()) {
+    clearStoredPassword();
+    currentData = null;
+    showLockScreen(messageSessionExpireeInactivite());
+  }
+}, 5 * 60 * 1000);
+
 let jsonpSeq = 0;
 function jsonpCall(params) {
   return new Promise((resolve, reject) => {
@@ -1025,6 +1067,7 @@ async function submitPassword() {
     return;
   }
   currentData = res;
+  enregistrerActivite();
   document.getElementById("lock-screen").hidden = true;
   render(res);
   maybeShowMessagePositifPopup(res);
@@ -1032,6 +1075,11 @@ async function submitPassword() {
 
 async function loadData(skipPopup) {
   if (!getStoredPassword()) { showLockScreen(); return; }
+  if (inactifDepuisTropLongtemps()) {
+    clearStoredPassword();
+    showLockScreen(messageSessionExpireeInactivite());
+    return;
+  }
   try {
     currentData = await jsonpCall({ action: "list" });
   } catch (e) {
@@ -1044,6 +1092,7 @@ async function loadData(skipPopup) {
     showLockScreen("Session expirée, retape le mot de passe.");
     return;
   }
+  enregistrerActivite();
   render(currentData);
   if (!skipPopup) maybeShowMessagePositifPopup(currentData);
 }
