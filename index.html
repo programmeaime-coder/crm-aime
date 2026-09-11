@@ -2710,26 +2710,42 @@ function statsTemplateABData(prospects) {
   };
   return { A: calc(parVariante.A), B: calc(parVariante.B) };
 }
-function templateABHtml(abData) {
-  // Meme seuil de fiabilite que tauxReponseBarsHtml (SEUIL_FIABLE_TAUX) --
-  // avant, un echantillon de 1-3 envois affichait un 33%/100% avec la meme
-  // autorite visuelle qu'un resultat sur des centaines d'envois, releve par
-  // Marie comme trompeur le 08/09.
-  const ligne = (label, info) => {
-    const fiable = info.total >= SEUIL_FIABLE_TAUX;
-    return `
+// Colonne de taux de reponse partagee entre le Test A/B et le taux de
+// reponse Recontact (meme seuil de fiabilite SEUIL_FIABLE_TAUX -- avant,
+// un echantillon de 1-3 envois affichait un 33%/100% avec la meme autorite
+// visuelle qu'un resultat sur des centaines d'envois, releve par Marie comme
+// trompeur le 08/09).
+function tauxReponseColHtml(label, info) {
+  const fiable = info.total >= SEUIL_FIABLE_TAUX;
+  return `
     <div class="tplab-col">
       <div class="stat__value ${fiable ? "" : "muted"}">${info.total ? info.pct + "%" : "—"}</div>
       <div class="stat__label">${escapeHtml(label)} ${info.total ? `(${info.repondus}/${info.total})` : "(aucun envoi identifié)"}</div>
       ${info.total && !fiable ? `<div class="muted" style="font-size:9px;margin-top:2px;">échantillon trop petit (n&lt;${SEUIL_FIABLE_TAUX})</div>` : ""}
     </div>
   `;
-  };
+}
+// Taux de reponse au message de "Recontact" (contacts froids/dormants,
+// statut Recontacter) -- demande de Marie le 11/09/2026, absent des stats
+// jusqu'ici alors que ce flux genere un vrai volume d'envois (voir
+// dateEnvoiRecontacte). Meme logique "reponse globale, peu importe quand"
+// que le Test A/B ci-dessus (meme caveat assume).
+function statsRecontacterData(prospects) {
+  const contactes = prospects.filter(p => !!p.dateEnvoiRecontacte);
+  const total = contactes.length;
+  const repondus = contactes.filter(p => !!p.dateReponse).length;
+  return { total, repondus, pct: total ? Math.round((repondus / total) * 100) : null };
+}
+function templateABHtml(abData, recontacterData) {
   return `
     <div class="viz-block__title" style="font-size:12.5px;">Test A/B — 1er message</div>
     <div class="tplab-row">
-      ${ligne("Template A (ancien)", abData.A)}
-      ${ligne("Template B (nouveau)", abData.B)}
+      ${tauxReponseColHtml("Template A (ancien)", abData.A)}
+      ${tauxReponseColHtml("Template B (nouveau)", abData.B)}
+    </div>
+    <div class="viz-block__title" style="font-size:12.5px;margin-top:0.8rem;">Message de recontact</div>
+    <div class="tplab-row">
+      ${tauxReponseColHtml("Recontact (contacts froids)", recontacterData)}
     </div>
   `;
 }
@@ -3050,7 +3066,7 @@ function renderStatsSection(data) {
             ${segmentsOffresVendues.length ? segmentBarsHtml(segmentsOffresVendues) : `<p class="muted">Formule pas encore renseignée sur tes clientes.</p>`}
           </div>
           <div class="viz-block">
-            ${templateABHtml(statsTemplateABData(prospects))}
+            ${templateABHtml(statsTemplateABData(prospects), statsRecontacterData(prospects))}
           </div>
         </div>
       </div>
@@ -4039,6 +4055,19 @@ function preparerActionEnvoi(p) {
   const template = messageTemplatesActuels()[cle] || "";
   const prenom = (p.nom || "").split(" ")[0];
   copierTexte(template.replace("{prenom}", prenom));
+  // Tag automatique de la variante A/B au moment ou le texte du 1er message
+  // est copie pour etre envoye (demande de Marie le 11/09/2026 : le copier-
+  // coller EST l'acte d'envoi en pratique, donc c'est le moment le plus fiable
+  // pour savoir laquelle des deux variantes part reellement -- plus fiable que
+  // la deduction par date/historique (variantePourDateHistorique), qui reste
+  // un filet de securite pour tout 1er message envoye hors Rafale. Garde-fou
+  // !p.templateVarianteManuelle : n'ecrase jamais une variante deja tagguee
+  // (evite un appel reseau et une reecriture inutiles si le bouton est
+  // recopie par erreur pour la meme fiche).
+  if (cle === "Nouveau" && !p.templateVarianteManuelle) {
+    const actif = (currentData.objectifs && currentData.objectifs.templateNouveauActif) || DEFAULT_TEMPLATE_NOUVEAU_ACTIF;
+    updateField(p.ligne, "templateVarianteManuelle", actif);
+  }
   ouvrirProfilRafaleThrottle(p);
 }
 function urgencePourActions(p) {
