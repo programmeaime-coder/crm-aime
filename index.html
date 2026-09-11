@@ -75,6 +75,9 @@ body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text);
 .banner__title em { font-style: normal; opacity: 0.45; padding: 0 2px; }
 .banner__byline { font-size: 15px; font-weight: 300; opacity: 0.7; }
 .banner__date { font-family: 'DM Sans', sans-serif; font-size: 12px; letter-spacing: 0.06em; color: var(--text-muted); text-transform: capitalize; }
+.banner__right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.banner__logout { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-muted); background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; opacity: 0.65; }
+.banner__logout:hover { opacity: 1; }
 
 .wrap { max-width: 1300px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
 
@@ -538,7 +541,10 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
     <img src="marie.jpg" alt="Marie" class="banner__avatar">
     <div class="banner__title">CRM <em>—</em> AIME <span class="banner__byline">by M.</span></div>
   </div>
-  <div class="banner__date" id="banner-date"></div>
+  <div class="banner__right">
+    <div class="banner__date" id="banner-date"></div>
+    <button type="button" class="banner__logout" id="banner-logout" onclick="deconnexion()" title="Efface le mot de passe enregistré sur cet ordinateur">Se déconnecter</button>
+  </div>
 </div>
 
 <div class="wrap" id="app">
@@ -806,6 +812,19 @@ const PWD_KEY = "crmAimePwd";
 function getStoredPassword() { return localStorage.getItem(PWD_KEY) || ""; }
 function setStoredPassword(p) { localStorage.setItem(PWD_KEY, p); }
 function clearStoredPassword() { localStorage.removeItem(PWD_KEY); }
+// Bouton "Se déconnecter" (banniere) -- ajoute le 11/09/2026 (audit
+// securite, demande de Marie) : jusque-la, rien n'effacait le mot de passe
+// enregistre dans ce navigateur sauf une erreur de frappe ou une session
+// expiree -- aucun moyen de le faire volontairement (ex. avant de preter
+// l'ordinateur). Ne resout pas la limite structurelle du mot de passe qui
+// transite en clair (voir jsonpCall) -- reduit juste la fenetre pendant
+// laquelle il reste enregistre sur cette machine.
+function deconnexion() {
+  if (!confirm("Effacer le mot de passe enregistré sur cet ordinateur ?\n\nTu devras le retaper pour rouvrir le CRM.")) return;
+  clearStoredPassword();
+  currentData = null;
+  showLockScreen();
+}
 
 let jsonpSeq = 0;
 function jsonpCall(params) {
