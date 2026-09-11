@@ -35,6 +35,14 @@
 
 (function () {
   var u = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
+  // Token d'automatisation exige cote Code.gs depuis le 11/09/2026 (audit
+  // securite -- captureLot etait ouvert sans aucun controle, exploitable par
+  // n'importe qui connaissant l'URL, publique puisque ce fichier est sur un
+  // depot GitHub public). REMPLACE la valeur ci-dessous par le vrai token
+  // avant de coller ce bookmarklet dans tes favoris -- ne jamais committer la
+  // vraie valeur ici (elle doit rester uniquement dans ton favori Chrome et
+  // dans TOKEN_AUTOMATION de ton Code.gs reel, tous les deux hors du depot).
+  var TOKEN = "COLLE_TON_TOKEN_ICI";
   var reponse = prompt("Combien de paliers de defilement ?", "20");
   if (reponse === null) return;
   var PALIERS = parseInt(reponse, 10);
@@ -225,7 +233,7 @@
     window.addEventListener("message", surMessage);
     paquets.forEach(function (paquet, idx) {
       setTimeout(function () {
-        var url = u + "?action=captureLot&donnees=" + encodeURIComponent(JSON.stringify(paquet));
+        var url = u + "?action=captureLot&token=" + encodeURIComponent(TOKEN) + "&donnees=" + encodeURIComponent(JSON.stringify(paquet));
         window.open(url, "crmaime_auto_" + idx);
       }, idx * 2200);
     });

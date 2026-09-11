@@ -588,6 +588,24 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGohJUbiUA4uAaXlUZRjmRRl4ZA4LhvTb57DnmwCzbfwUFGu5Zl6xml/exec";
+// Doit rester identique a VERSION_CODE dans Code.gs. Un push (MCP/API) sur
+// Code.gs ne deploie PAS automatiquement une nouvelle version Apps Script --
+// seul "Deployer > Nouvelle version" dans l'editeur rend le code actif (voir
+// audit du 11/09/2026, point deploiement). Cette comparaison permet de
+// detecter un ecart entre le code local et ce qui tourne reellement, sans
+// avoir a rouvrir l'editeur pour verifier.
+const VERSION_ATTENDUE_BACKEND = "2026-09-11a";
+let alerteVersionAffichee = false;
+function verifierVersionBackend(data) {
+  if (alerteVersionAffichee || !data || !data.version || data.version === VERSION_ATTENDUE_BACKEND) return;
+  alerteVersionAffichee = true;
+  const banniere = document.getElementById("banner-date");
+  if (!banniere) return;
+  const avertissement = document.createElement("div");
+  avertissement.style.cssText = "margin-top:0.35rem;font-size:0.8rem;color:#a15c00;";
+  avertissement.textContent = `⚠ Backend déployé (${data.version}) ≠ code local (${VERSION_ATTENDUE_BACKEND}) — vérifie qu'une nouvelle version a bien été déployée dans l'éditeur Apps Script.`;
+  banniere.after(avertissement);
+}
 
 // Valeurs par defaut des messages-type, utilisees tant que Marie n'a pas
 // enregistre ses propres versions via le bouton "Template" (onglet Prospects) --
@@ -906,6 +924,14 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+// N'autorise un lien comme href cliquable que s'il commence par http(s) --
+// escapeHtml() protege contre l'injection de balises, pas contre un schema
+// "javascript:" (execute au clic, target="_blank" ou non). Ajoute le
+// 11/09/2026 (audit securite) en defense en profondeur, en plus du filtrage
+// deja fait cote Code.gs a la capture.
+function estUrlHttp(valeur) {
+  return /^https?:\/\//i.test(String(valeur || ""));
+}
 
 let currentData = null;
 let currentTab = "dashboard";
@@ -913,16 +939,28 @@ let rechercheTexte = "";
 function normaliserTexte(s) {
   return (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
+// Debounce ajoute le 11/09/2026 (audit perf) : render() reconstruit
+// l'innerHTML des 4 onglets (potentiellement des milliers de lignes avec
+// 2300+ prospects) -- sans debounce, ca partait a CHAQUE frappe clavier.
+// L'input reste geree nativement par le navigateur pendant la frappe (le DOM
+// n'est pas touche tant que rechercheDebounceId est en attente), seul le
+// rendu complet (et le focus/curseur a restaurer, puisque render() remplace
+// l'element input) est differe jusqu'a la pause de frappe.
+let rechercheDebounceId = null;
 function onRechercheInput(el) {
   rechercheTexte = el.value;
   const id = el.id;
   const pos = el.selectionStart;
-  render(currentData);
-  const nouvelEl = document.getElementById(id);
-  if (nouvelEl) {
-    nouvelEl.focus();
-    try { nouvelEl.setSelectionRange(pos, pos); } catch (err) {}
-  }
+  if (rechercheDebounceId) clearTimeout(rechercheDebounceId);
+  rechercheDebounceId = setTimeout(() => {
+    rechercheDebounceId = null;
+    render(currentData);
+    const nouvelEl = document.getElementById(id);
+    if (nouvelEl) {
+      nouvelEl.focus();
+      try { nouvelEl.setSelectionRange(pos, pos); } catch (err) {}
+    }
+  }, 150);
 }
 
 function showLockScreen(errorMsg) {
@@ -993,6 +1031,7 @@ async function loadData(skipPopup) {
 
 function render(data) {
   document.getElementById("banner-date").textContent = new Date().toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  verifierVersionBackend(data);
   document.getElementById("loading").hidden = true;
   document.getElementById("tabs").hidden = false;
 
@@ -1957,7 +1996,7 @@ function renderProspectsTable(prospects) {
     const tempOptions = TEMP_OPTIONS.map(o => `<option value="${escapeHtml(o)}" ${o === p.temperature ? "selected" : ""}>${escapeHtml(o)}</option>`).join("");
 
     const sousLignes = [p.lieu, p.age ? p.age + " ans" : ""].filter(Boolean).join(" · ");
-    const lienBtn = p.lien ? `<a class="link-btn link-btn--accent" href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Profil →</a>` : "";
+    const lienBtn = estUrlHttp(p.lien) ? `<a class="link-btn link-btn--accent" href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Profil →</a>` : "";
     const messageBtn = `<button class="link-btn" data-action="copy-message" data-nom="${escapeHtml(p.nom)}" data-statut="${escapeHtml(templateKeyPourEnvoi(p))}">Copier msg</button>`;
 
     return `
@@ -3725,7 +3764,7 @@ function rafaleEnTeteHtml(p, total) {
     <div class="muted" style="margin-bottom:0.5rem;">${rafaleIndex + 1} / ${total}</div>
     <h2 style="margin-bottom:0.25rem;">${escapeHtml(p.nom)}</h2>
     <p class="muted" style="margin-bottom:1rem;">${escapeHtml(p.poste || "")}</p>
-    ${p.lien ? `<p style="margin-bottom:1rem;"><a href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Voir le profil LinkedIn ↗</a></p>` : `<p class="muted" style="margin-bottom:1rem;">Pas de lien LinkedIn enregistré.</p>`}
+    ${estUrlHttp(p.lien) ? `<p style="margin-bottom:1rem;"><a href="${escapeHtml(p.lien)}" target="_blank" rel="noopener">Voir le profil LinkedIn ↗</a></p>` : `<p class="muted" style="margin-bottom:1rem;">Pas de lien LinkedIn enregistré.</p>`}
   `;
 }
 
