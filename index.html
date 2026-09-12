@@ -332,6 +332,7 @@ select.formule-select:focus { outline: 1.5px solid var(--bordeaux); }
 .reminder-list li:last-child { border-bottom: none; }
 .reminder-list .name-cell { font-size: 16px; }
 .reminder-tag { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.reminder-note { font-size: 12.5px; color: var(--text-muted); margin-top: 0.5rem; }
 
 /* ─── Tableau de bord : objectifs ─── */
 .objectifs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; }
@@ -1385,9 +1386,30 @@ function relancesADemainHtml(prospects) {
   const total = lignes.reduce((sum, [, n]) => sum + n, 0);
   if (!total) return `<p class="muted">Rien à traiter pour l'instant.</p>`;
 
+  // Plan du jour (30 actions max, reparties par categorie -- voir
+  // quotaDuJour) : ce que Rafale sert VRAIMENT si elle est ouverte
+  // maintenant, par opposition au backlog total ci-dessus qui peut etaler
+  // sur plusieurs semaines (ex. 257 "à recontacter" le 12/09/2026).
+  const cats = candidatsQuotaCategories(prospects);
+  const quota = quotaDuJour(cats);
+  const nonVu = (cat) => cats[cat].filter(p => !estVuAujourdhui(p.lien)).length;
+  const quotaLignes = [
+    ["relance 1", Math.min(quota.relance1, nonVu("relance1"))],
+    ["relance 2", Math.min(quota.relance2, nonVu("relance2"))],
+    ["premier message", Math.min(quota.nouveaux, nonVu("nouveaux"))],
+    ["connexion à évaluer", Math.min(quota.connexions, nonVu("connexions"))],
+    ["à recontacter", Math.min(quota.recontacter, nonVu("recontacter"))],
+  ].filter(([, n]) => n > 0);
+  const totalQuota = quotaLignes.reduce((sum, [, n]) => sum + n, 0);
+
   return `<div class="rappel-item rappel-item--block">
     <div><b>${total} action${total > 1 ? "s" : ""} à traiter</b></div>
     ${lignes.map(([label, n]) => `<div>• ${n} ${escapeHtml(label)}</div>`).join("")}
+    ${totalQuota > 0 ? `
+      <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:0.5px solid var(--border);">
+        <div><b>Aujourd'hui (${totalQuota}/${PLAFOND_ACTIONS_RAFALE_JOUR}) :</b></div>
+        ${quotaLignes.map(([label, n]) => `<div>• ${n} ${escapeHtml(label)}</div>`).join("")}
+      </div>` : ""}
   </div>`;
 }
 // Fait avancer Nb relances ET Statut ensemble, pour que les deux restent
@@ -3809,31 +3831,42 @@ function rafalePrecedent() {
   }
 }
 // Limite le rythme d'ouverture automatique des profils LinkedIn depuis les
-// rafales -- LinkedIn a restreint le compte de Marie le 08/09/2026 ("volume
-// inhabituellement eleve de donnees de profil"). Cause identifiee : chaque
-// carte de rafale ouvrait un profil automatiquement, sans aucun delai, ce qui
-// permet d'enchainer des dizaines de profils en quelques secondes via les
-// raccourcis clavier 1/2/3/4 -- exactement le rythme que LinkedIn detecte
-// comme du scraping. Trois garde-fous cumules (reglages resserres le
-// 08/09/2026 a la demande de Marie, suite a une 1ere version plus laxiste) :
-// espacement minimal entre deux ouvertures AUTOMATIQUES, pause obligatoire
-// toutes les 25 ouvertures, et avertissement periodique sur le volume
-// journalier (voir compterOuverturesProfilJour). Le lien "Voir le profil
-// LinkedIn" affiche par rafaleEnTeteHtml sur chaque carte reste toujours
-// disponible en secours si une ouverture est sautee -- rien n'est jamais
-// bloque pour de vrai, seulement espace/retarde.
-// Ouverture automatique DESACTIVEE depuis le 11/09/2026 (demande de Marie) :
-// meme throttlee, elle a de nouveau declenche une restriction du compte
-// LinkedIn (2e fois). Elle garde tout le reste de la rafale (defilement des
-// cartes, boutons de decision) mais ne veut plus aucune fenetre LinkedIn
-// ouverte automatiquement -- seul le lien manuel "Voir le profil LinkedIn"
-// (rafaleEnTeteHtml, sur chaque carte) reste disponible. Pour revenir a une
-// ouverture automatique throttlee : repasser ce flag a false.
-const OUVERTURE_AUTO_PROFIL_RAFALE_DESACTIVEE = true;
+// rafales -- LinkedIn a restreint deux fois le compte de Marie : une 1ere
+// fois debut septembre 2026 (simple deconnexion, reconnexion possible), puis
+// une 2eme fois le 08/09/2026, beaucoup plus lourde (compte bloque plusieurs
+// heures). Ce garde-fou a ete construit juste APRES le 08/09, en reaction --
+// il n'a donc encore jamais tourne en usage reel, l'auto-ouverture ayant ete
+// desactivee des le 11/09 (voir plus bas) avant d'avoir pu le tester. Quatre
+// garde-fous cumules (reglages du 12/09/2026, demande explicite de Marie --
+// paquets de 10 avec pause de 20 min, delai variable plutot que fixe pour ne
+// pas reproduire un rythme mecanique) : espacement ALEATOIRE entre deux
+// ouvertures AUTOMATIQUES (15-40s, jamais un delai fixe -- un intervalle
+// parfaitement regulier est justement ce qui distingue un script d'un humain),
+// pause obligatoire toutes les 10 ouvertures, compteur serveur bloquant
+// (Code.gs, 30/jour), et avertissement periodique sur le volume journalier
+// (voir compterOuverturesProfilJour). Le lien "Voir le profil LinkedIn"
+// affiche par rafaleEnTeteHtml sur chaque carte reste toujours disponible en
+// secours si une ouverture est sautee -- rien n'est jamais bloque pour de
+// vrai, seulement espace/retarde.
+// Avait ete DESACTIVEE du 11/09 au 12/09/2026 (demande de Marie, par
+// precaution suite a la restriction du 08/09, le temps de revoir ces
+// garde-fous -- voir plus haut). Reactivee le 12/09/2026 avec les reglages
+// ci-dessus (delai aleatoire, pause toutes les 10, plafond serveur 30/j).
+// Pour desactiver a nouveau si besoin : repasser ce flag a true (garde tout
+// le reste de la rafale -- defilement des cartes, boutons de decision --
+// seul le lien manuel "Voir le profil LinkedIn" reste alors disponible).
+const OUVERTURE_AUTO_PROFIL_RAFALE_DESACTIVEE = false;
 let dernierOuvertureProfilRafaleTs = 0;
-const DELAI_MIN_OUVERTURE_PROFIL_MS = 4000;
-const SEUIL_PAUSE_OBLIGATOIRE_PROFILS = 25;
-const DUREE_PAUSE_OBLIGATOIRE_MS = 20 * 60 * 1000; // 20 min -- milieu de la fourchette 15-30 demandee par Marie
+// Plage aleatoire (pas un delai fixe) entre deux ouvertures automatiques --
+// voir le commentaire ci-dessus sur la regularite mecanique.
+const DELAI_MIN_OUVERTURE_PROFIL_PLAGE_MS = [15000, 40000];
+let delaiMinOuvertureProfilMs = DELAI_MIN_OUVERTURE_PROFIL_PLAGE_MS[0];
+function tirerDelaiOuvertureProfilMs() {
+  const [min, max] = DELAI_MIN_OUVERTURE_PROFIL_PLAGE_MS;
+  return min + Math.random() * (max - min);
+}
+const SEUIL_PAUSE_OBLIGATOIRE_PROFILS = 10; // paquets de 10 (demande de Marie, 12/09) -- etait 25
+const DUREE_PAUSE_OBLIGATOIRE_MS = 20 * 60 * 1000; // 20 min minimum entre deux paquets
 let compteurBurstOuverturesProfil = 0;
 let pauseOuvertureProfilJusqua = 0;
 async function ouvrirProfilRafaleThrottle(p) {
@@ -3845,7 +3878,7 @@ async function ouvrirProfilRafaleThrottle(p) {
     pauseOuvertureProfilJusqua = 0;
     compteurBurstOuverturesProfil = 0;
   }
-  if (maintenant - dernierOuvertureProfilRafaleTs < DELAI_MIN_OUVERTURE_PROFIL_MS) return;
+  if (maintenant - dernierOuvertureProfilRafaleTs < delaiMinOuvertureProfilMs) return;
   // Verifie le compteur PARTAGE cote serveur (Code.gs, voir pingLinkedin_ /
   // SEUIL_LINKEDIN_JOUR) -- seul point commun avec bookmarklet-crm-auto.js
   // (origine linkedin.com, ne peut pas partager un compteur cote client avec
@@ -3859,7 +3892,9 @@ async function ouvrirProfilRafaleThrottle(p) {
     return; // pas de reponse -- on prefere ne pas ouvrir plutot que de deviner
   }
   dernierOuvertureProfilRafaleTs = maintenant;
+  delaiMinOuvertureProfilMs = tirerDelaiOuvertureProfilMs(); // nouveau delai aleatoire pour la PROCHAINE ouverture
   window.open(p.lien, "_blank");
+  marquerVuAujourdhui(p.lien); // alimente le quota du jour par categorie -- voir plus bas
   compteurBurstOuverturesProfil++;
   compterOuverturesProfilJour();
   if (compteurBurstOuverturesProfil >= SEUIL_PAUSE_OBLIGATOIRE_PROFILS) {
@@ -4126,6 +4161,105 @@ function urgencePourActions(p) {
   if (r) return parseFrDate(r);
   return today0();
 }
+
+// ─── Quota quotidien reparti par categorie (demande de Marie, 12/09/2026) ───
+// Avant : Rafale servait tout le backlog d'un coup (362 actions le 12/09,
+// dont 257 "a recontacter") -- stressant et risque vis-a-vis du plafond
+// LinkedIn (30/j, voir SEUIL_LINKEDIN_JOUR cote Code.gs). Chaque categorie a
+// une base de 5/jour ; ce qui n'est pas utilise (categorie avec moins de 5
+// candidats) est redistribue aux autres categories, dans l'ordre de
+// priorite ci-dessous, jusqu'a 30 au total. Marie choisit explicitement de
+// PLAFONNER aussi les relances a leur part (pas de passe-droit "toutes les
+// relances d'abord, meme au-dela de 30") : un pic de relances s'etale sur
+// plusieurs jours plutot que de vider le quota d'un coup au detriment des
+// autres categories -- "si je fais mes 30 actions par jour assidument, je
+// vais finir par rattraper" (ses mots).
+const QUOTA_BASE_CATEGORIE = { relance1: 5, relance2: 5, nouveaux: 5, connexions: 5, recontacter: 5 };
+const QUOTA_ORDRE_PRIORITE = ["relance1", "relance2", "nouveaux", "connexions", "recontacter"];
+const PLAFOND_ACTIONS_RAFALE_JOUR = 30; // aligne sur SEUIL_LINKEDIN_JOUR (Code.gs)
+// Marque un lien LinkedIn comme "deja vu aujourd'hui" au moment ou son profil
+// est reellement ouvert (voir ouvrirProfilRafaleThrottle) -- source de verite
+// UNIQUE pour "combien reste dans le quota du jour de chaque categorie",
+// reutilisee pour toutes les categories (y compris "connexions", ou aucun
+// champ date n'est ecrit quand la demande reste "toujours en attente" --
+// sans ce marqueur, les memes profils reapparaitraient en boucle le meme
+// jour au lieu de tourner vers les suivants).
+function cleVuesAujourdhui() { return "crmLiensVusAujourdhui_" + new Date().toISOString().slice(0, 10); }
+function marquerVuAujourdhui(lien) {
+  if (!lien) return;
+  try {
+    const cle = cleVuesAujourdhui();
+    const vus = JSON.parse(localStorage.getItem(cle) || "[]");
+    if (!vus.includes(lien)) { vus.push(lien); localStorage.setItem(cle, JSON.stringify(vus)); }
+  } catch (e) { /* localStorage indisponible -- tant pis, pas de quota fiable ce jour-la */ }
+}
+function estVuAujourdhui(lien) {
+  if (!lien) return false;
+  try {
+    return JSON.parse(localStorage.getItem(cleVuesAujourdhui()) || "[]").includes(lien);
+  } catch (e) { return false; }
+}
+// Regroupe les 5 categories concernees par le quota, triees comme avant
+// (memes regles que rafaleActionsCandidats/relancesADemainHtml, juste
+// factorisees ici pour eviter que les deux dérivent l'une de l'autre).
+function candidatsQuotaCategories(prospects) {
+  const nouveaux = prospects.filter(p => p.statut === "Nouveau" && !p.date1erMessage).sort(comparerDateAjoutDesc);
+  const relance1 = prospects.filter(p => {
+    if ((Number(p.nbRelances) || 0) !== 0) return false;
+    const r = nextRelance(p);
+    return !!(r && isOverdue(r));
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+  const relance2 = prospects.filter(p => {
+    if ((Number(p.nbRelances) || 0) !== 1) return false;
+    const r = nextRelance(p);
+    return !!(r && isOverdue(r));
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+  const connexions = prospects.filter(p => p.statut === "En attente de connexion").slice().sort((a, b) => {
+    const da = parseFrDate(a.dateAttenteConnexion);
+    const db = parseFrDate(b.dateAttenteConnexion);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da - db;
+  });
+  const recontacter = prospects.filter(p => {
+    if (p.statut !== "Recontacter") return false;
+    if (estADecider(p)) return true;
+    return !!(!p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel));
+  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
+  return { nouveaux, relance1, relance2, connexions, recontacter };
+}
+// A partir des candidats du jour (deja triees), calcule combien en servir
+// aujourd'hui par categorie : base 5 chacune (dans la limite du stock
+// disponible), puis le reliquat jusqu'a 30 va aux categories qui ont encore
+// du stock au-dela de leur base, dans QUOTA_ORDRE_PRIORITE. "Disponible" ici
+// exclut deja les profils vus aujourd'hui (voir estVuAujourdhui) -- le quota
+// retourne est donc directement le nombre a SERVIR maintenant, pas un total
+// journalier brut a recalculer soi-meme.
+function quotaDuJour(candidatsParCategorie) {
+  const restant = {};
+  for (const cat of QUOTA_ORDRE_PRIORITE) {
+    restant[cat] = candidatsParCategorie[cat].filter(p => !estVuAujourdhui(p.lien));
+  }
+  const quota = {};
+  let alloue = 0;
+  for (const cat of QUOTA_ORDRE_PRIORITE) {
+    const base = Math.min(QUOTA_BASE_CATEGORIE[cat], restant[cat].length);
+    quota[cat] = base;
+    alloue += base;
+  }
+  let reliquat = PLAFOND_ACTIONS_RAFALE_JOUR - alloue;
+  for (const cat of QUOTA_ORDRE_PRIORITE) {
+    if (reliquat <= 0) break;
+    const dispoSupplementaire = restant[cat].length - quota[cat];
+    if (dispoSupplementaire <= 0) continue;
+    const ajout = Math.min(dispoSupplementaire, reliquat);
+    quota[cat] += ajout;
+    reliquat -= ajout;
+  }
+  return quota;
+}
+
 // File priorisee par groupes (demande de Marie le 31/08/2026 : l'ancien tri
 // unique par urgencePourActions melangeait toutes les categories par date,
 // ce qui donnait une impression de desordre). Ordre fixe, un groupe apres
@@ -4145,55 +4279,45 @@ function urgencePourActions(p) {
 // retard en tete) ou par date d'ajout pour les nouveaux -- seule la logique
 // deja existante et testee, juste regroupee.
 function rafaleActionsCandidats() {
-  const nouveaux = currentData.prospects
-    .filter(p => p.statut === "Nouveau" && !p.date1erMessage)
-    .sort(comparerDateAjoutDesc);
+  // Categories geree par le quota du jour (relance1/relance2/nouveaux/
+  // recontacter -- "connexions" est servie par ouvrirRafaleConnexions, mais
+  // reste incluse dans le calcul du quota pour que le reliquat en tienne
+  // compte). Chaque liste est deja triee par urgence/date d'ajout (voir
+  // candidatsQuotaCategories) -- servir() ne fait que retirer les profils
+  // deja vus aujourd'hui et couper a la part du jour.
+  const cats = candidatsQuotaCategories(currentData.prospects);
+  const quota = quotaDuJour(cats);
+  const servir = (cat) => cats[cat].filter(p => !estVuAujourdhui(p.lien)).slice(0, quota[cat]);
 
-  // Bug corrige le 18/08/2026 : "Première relance"/"Deuxième relance" etaient
-  // inclus des l'entree dans ce statut (des l'enregistrement de Date 1er
-  // message, voir updateField), sans jamais verifier que le delai J+5/J+7 est
-  // ecoule -- un prospect contacte la veille se retrouvait donc propose pour
-  // sa relance des le lendemain. relancesADemainHtml() faisait deja ce
-  // controle correctement (isOverdue(nextRelance(p))) ; rafaleActionsCandidats
-  // ne le faisait pas. Repris ici pour rester coherent.
-  const enEnvoi = currentData.prospects.filter(p => {
-    if (p.statut === "Première relance" || (p.statut === "Deuxième relance" && (Number(p.nbRelances) || 0) < 2)) {
-      const r = nextRelance(p);
-      return !!(r && isOverdue(r));
-    }
-    return false;
-  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
-
+  // "A statuer" (decision, jamais d'ouverture automatique de profil -- voir
+  // preparerActionEnvoi/estCarteDecision) et "Reconnecter" (volume marginal)
+  // restent HORS quota, comme avant.
   const aStatuer = currentData.prospects
     .filter(p => p.statut !== "Recontacter" && estADecider(p))
     .sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
-
-  // "Recontacter" : contact froid (6 mois+) dont le rappel echelonne est
-  // depasse (jamais encore renvoye), ou dont le message de recontact a ete
-  // envoye mais reste sans reponse depuis 7j (estADecider) -- deux stades du
-  // meme statut, regroupes ici comme demande par Marie.
-  const aRecontacter = currentData.prospects.filter(p => {
-    if (p.statut !== "Recontacter") return false;
-    if (estADecider(p)) return true;
-    return !p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel);
-  }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
-
-  // "Reconnecter" : jamais connectee mais suit toujours (voir
-  // rafaleConnexionReconnecter) -- pas de phase "envoye, en attente de
-  // reponse" comme Recontacter, un seul stade : l'echeance du mois
-  // (dateRappel) depassee declenche l'envoi d'une nouvelle demande de
-  // connexion avec note. Une fois "Envoye" (rafaleActionsEnvoyerSuivant),
-  // la fiche repasse en "En attente de connexion" et retombe dans le
-  // circuit normal (Rafale : demandes de connexion).
   const aReconnecter = currentData.prospects.filter(p => {
     return p.statut === "Reconnecter" && p.dateRappel && isOverdue(p.dateRappel);
   }).sort((a, b) => urgencePourActions(a) - urgencePourActions(b));
 
-  return [...nouveaux, ...enEnvoi, ...aStatuer, ...aRecontacter, ...aReconnecter];
+  // Ordre d'affichage : relances en tete (priorite explicite de Marie),
+  // puis nouveaux, puis les decisions (jamais bloquantes vis-a-vis du
+  // quota), puis recontacter, puis reconnecter en dernier.
+  return [...servir("relance1"), ...servir("relance2"), ...servir("nouveaux"), ...aStatuer, ...servir("recontacter"), ...aReconnecter];
 }
 function ouvrirRafaleActions() {
   rafaleQueue = rafaleActionsCandidats();
-  if (rafaleQueue.length === 0) { alert("Rien à faire pour l'instant : tout est à jour."); return; }
+  if (rafaleQueue.length === 0) {
+    // Distingue "plus rien du tout" de "quota du jour deja atteint, il reste
+    // du stock pour demain" -- sinon Marie pourrait croire a tort que tout
+    // est traite alors qu'elle a juste deja fait ses 30 actions.
+    const cats = candidatsQuotaCategories(currentData.prospects);
+    const resteBacklog = ["relance1", "relance2", "nouveaux", "recontacter"]
+      .some(cat => cats[cat].some(p => !estVuAujourdhui(p.lien)));
+    alert(resteBacklog
+      ? "Quota du jour atteint (30 actions). Le reste attend demain."
+      : "Rien à faire pour l'instant : tout est à jour.");
+    return;
+  }
   rafaleMode = "actions";
   rafaleIndex = 0;
   document.getElementById("rafale-overlay").hidden = false;
@@ -4385,22 +4509,20 @@ async function rafaleActionsDecisionClasser(statutCible) {
 // toujours en attente (le compteur des 3 semaines n'est donc jamais
 // perturbe par un simple passage dans cette rafale).
 function ouvrirRafaleConnexions() {
-  rafaleQueue = currentData.prospects
-    .filter(p => p.statut === "En attente de connexion")
-    .slice()
-    // Plus ancienne d'abord : priorise celles qui approchent ou depassent deja
-    // les 3 semaines. Date inconnue (prospects anciens, avant l'ajout de la
-    // colonne V) reléguée en fin de file plutôt qu'en tête, faute de moyen de
-    // juger son urgence réelle.
-    .sort((a, b) => {
-      const da = parseFrDate(a.dateAttenteConnexion);
-      const db = parseFrDate(b.dateAttenteConnexion);
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      return da - db;
-    });
-  if (rafaleQueue.length === 0) { alert("Rien à balayer : aucune demande de connexion en attente."); return; }
+  // Categorisation/tri centralises dans candidatsQuotaCategories (meme ordre
+  // qu'avant : plus ancienne demande d'abord) -- quotaDuJour() tient compte
+  // des 4 autres categories (voir rafaleActionsCandidats) pour ne pas
+  // depasser 30 actions au total sur la journee, tous flux confondus.
+  const cats = candidatsQuotaCategories(currentData.prospects);
+  const quota = quotaDuJour(cats);
+  const nonVues = cats.connexions.filter(p => !estVuAujourdhui(p.lien));
+  rafaleQueue = nonVues.slice(0, quota.connexions);
+  if (rafaleQueue.length === 0) {
+    alert(cats.connexions.length === 0
+      ? "Rien à balayer : aucune demande de connexion en attente."
+      : "Quota du jour atteint (30 actions). Le reste attend demain.");
+    return;
+  }
   rafaleMode = "connexions";
   rafaleIndex = 0;
   rafaleConnexionEnEnvoi = false;
@@ -4650,38 +4772,63 @@ function maybeShowMessagePositifPopup(data) {
 
 // ─── Popup de relance quotidienne (une fois par jour) ───
 
+// Popup quotidien : reprend EXACTEMENT le meme quota que Rafale/le tableau
+// de bord (candidatsQuotaCategories/quotaDuJour, voir plus haut) -- avant le
+// 12/09/2026 ce popup avait son propre plafond de 30 calcule differemment
+// (relances+recontacts+purge, sans nouveaux ni connexions a evaluer), ce qui
+// pouvait afficher un chiffre different de ce que Rafale servait vraiment
+// une fois ouverte. Une seule source de verite maintenant, partout.
 function maybeShowReminderPopup(data) {
   const todayKey = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem("crmPopupShown") === todayKey) return;
 
-  const relances = [];
-  const recontacts = [];
+  const cats = candidatsQuotaCategories(data.prospects);
+  const quota = quotaDuJour(cats);
+  const nonVu = (cat) => cats[cat].filter(p => !estVuAujourdhui(p.lien));
+  const nServis = (cat) => Math.min(quota[cat], nonVu(cat).length);
+  const totalDispoQuota = QUOTA_ORDRE_PRIORITE.reduce((s, cat) => s + nonVu(cat).length, 0);
+
+  // "Connexions a purger" (21j+ sans reponse, simple nettoyage/suppression --
+  // pas un envoi de message) et "a decider" (classement interne, pas
+  // forcement une visite LinkedIn) restent HORS quota, comme avant.
   const connexionsAPurger = [];
-  const aDecider = [];
+  let aDecider = 0;
   for (const p of data.prospects) {
-    const r = nextRelance(p);
-    if (r && isOverdue(r)) relances.push(p);
-    else if (!p.dateEnvoiRecontacte && p.dateRappel && isOverdue(p.dateRappel)) recontacts.push(p);
     if (p.statut === "En attente de connexion" && p.dateAttenteConnexion) {
       const d = parseFrDate(p.dateAttenteConnexion);
       if (d && Math.round((today0() - d) / 86400000) >= 21) connexionsAPurger.push(p);
     }
-    if (estADecider(p)) aDecider.push(p);
+    if (estADecider(p)) aDecider++;
   }
-  if (relances.length === 0 && recontacts.length === 0 && connexionsAPurger.length === 0 && aDecider.length === 0) return;
 
-  const relanceItems = relances.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Relance à envoyer</span></li>`).join("");
-  const recontactItems = recontacts.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">A recontacter</span></li>`).join("");
-  const connexionItems = connexionsAPurger.map(p => `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">Connexion en attente depuis 3+ semaines — à supprimer</span></li>`).join("");
-  const aDeciderItems = aDecider.map(p => {
-    const cfg = DECISION_CONFIG[p.statut];
-    const j = joursEcoules(p[cfg.dateChamp]);
-    return `<li><div class="name-cell">${escapeHtml(p.nom)}</div><span class="reminder-tag">${escapeHtml(cfg.libelle(j))}</span></li>`;
-  }).join("");
+  const nRelance1 = nServis("relance1");
+  const nRelance2 = nServis("relance2");
+  const nNouveaux = nServis("nouveaux");
+  const nConnexions = nServis("connexions");
+  const nRecontacter = nServis("recontacter");
+  const totalDuJour = nRelance1 + nRelance2 + nNouveaux + nConnexions + nRecontacter;
+  const resteBacklog = totalDispoQuota - totalDuJour;
 
+  if (totalDuJour === 0 && connexionsAPurger.length === 0 && aDecider === 0) return;
+
+  // Pas de liste de noms (demande explicite de Marie, 12/09 -- voir un
+  // volume total genait deja, alors une liste de 30+ noms encore plus) :
+  // juste un recap chiffre par categorie, les noms restent consultables
+  // via Rafale/le tableau de bord au moment de traiter.
+  const lignes = [];
+  if (nRelance1 > 0) lignes.push(`<li>${nRelance1} relance 1 à envoyer</li>`);
+  if (nRelance2 > 0) lignes.push(`<li>${nRelance2} relance 2 à envoyer</li>`);
+  if (nNouveaux > 0) lignes.push(`<li>${nNouveaux} premier message à envoyer</li>`);
+  if (nConnexions > 0) lignes.push(`<li>${nConnexions} connexion${nConnexions > 1 ? "s" : ""} à évaluer</li>`);
+  if (nRecontacter > 0) lignes.push(`<li>${nRecontacter} recontact${nRecontacter > 1 ? "s" : ""} à envoyer</li>`);
+  if (connexionsAPurger.length > 0) lignes.push(`<li>${connexionsAPurger.length} connexion${connexionsAPurger.length > 1 ? "s" : ""} en attente à purger</li>`);
+  if (aDecider > 0) lignes.push(`<li>${aDecider} prospect${aDecider > 1 ? "s" : ""} à décider <span class="reminder-tag">voir le tableau de bord</span></li>`);
+
+  const totalAffiche = totalDuJour + connexionsAPurger.length + aDecider;
   document.getElementById("reminder-content").innerHTML = `
-    <h2>${relances.length + recontacts.length + connexionsAPurger.length + aDecider.length} personne(s) nécessitent une action aujourd'hui</h2>
-    <ul class="reminder-list">${relanceItems}${recontactItems}${connexionItems}${aDeciderItems}</ul>
+    <h2>${totalAffiche} action${totalAffiche > 1 ? "s" : ""} à faire aujourd'hui</h2>
+    <ul class="reminder-list">${lignes.join("")}</ul>
+    ${resteBacklog > 0 ? `<p class="reminder-note">D'autres arriveront progressivement dans les prochains jours.</p>` : ""}
     <div class="modal-actions">
       <button class="btn" onclick="document.getElementById('reminder-overlay').hidden = true;">C'est noté</button>
     </div>
