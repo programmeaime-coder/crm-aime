@@ -601,7 +601,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxZzn8VyJR3YvGo
 // audit du 11/09/2026, point deploiement). Cette comparaison permet de
 // detecter un ecart entre le code local et ce qui tourne reellement, sans
 // avoir a rouvrir l'editeur pour verifier.
-const VERSION_ATTENDUE_BACKEND = "2026-09-11b";
+const VERSION_ATTENDUE_BACKEND = "2026-09-12a";
 let alerteVersionAffichee = false;
 function verifierVersionBackend(data) {
   if (alerteVersionAffichee || !data || !data.version || data.version === VERSION_ATTENDUE_BACKEND) return;
