@@ -48,7 +48,14 @@
   var PALIERS = parseInt(reponse, 10);
   if (!PALIERS || PALIERS < 1) PALIERS = 20;
   var PAS = 800;
-  var DELAI = 1800;
+  // Plage aleatoire (pas un delai fixe) entre deux paliers de defilement --
+  // ce script tourne DANS la page LinkedIn (contrairement a Rafale sur le
+  // CRM externe), donc un rythme de scroll parfaitement regulier y est le
+  // signal le plus directement observable par LinkedIn. Ajoute le 13/09/2026.
+  var DELAI_PLAGE_MS = [1400, 2400];
+  function tirerDelaiMs() {
+    return DELAI_PLAGE_MS[0] + Math.random() * (DELAI_PLAGE_MS[1] - DELAI_PLAGE_MS[0]);
+  }
   var profils = [];
   var vus = {};
 
@@ -257,6 +264,8 @@
     // Recollecte a mi-parcours de la pause : rattrape les photos de profil
     // qui finissent de charger pendant que la carte est encore a l'ecran,
     // sans attendre le palier suivant (qui aura deja scrolle la carte hors champ).
+    // Delai retire a chaque moitie -- pas le meme des deux cotes, pour eviter
+    // un rythme "moitie-moitie" lui-meme regulier.
     setTimeout(function () {
       collecter();
       if (palier >= PALIERS) {
@@ -265,8 +274,8 @@
       }
       window.scrollBy(0, PAS);
       palier++;
-      setTimeout(etape, DELAI / 2);
-    }, DELAI / 2);
+      setTimeout(etape, tirerDelaiMs());
+    }, tirerDelaiMs());
   }
   etape();
 })();

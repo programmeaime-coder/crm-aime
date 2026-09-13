@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Aucun referrer envoye aux liens externes (LinkedIn) -- evite d'identifier
+     cette page comme origine des vues de profil, cf. restrictions LinkedIn
+     de 09/2026. Seuls liens externes de la page : profils LinkedIn. -->
+<meta name="referrer" content="no-referrer">
 <title>CRM — AIME by M.</title>
 <style>
 @font-face { font-family: 'Cormorant Garamond'; src: url('fonts/cormorant-garamond-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -3838,12 +3842,15 @@ function rafalePrecedent() {
 // il n'a donc encore jamais tourne en usage reel, l'auto-ouverture ayant ete
 // desactivee des le 11/09 (voir plus bas) avant d'avoir pu le tester. Quatre
 // garde-fous cumules (reglages du 12/09/2026, demande explicite de Marie --
-// paquets de 10 avec pause de 20 min, delai variable plutot que fixe pour ne
-// pas reproduire un rythme mecanique) : espacement ALEATOIRE entre deux
-// ouvertures AUTOMATIQUES (15-40s, jamais un delai fixe -- un intervalle
-// parfaitement regulier est justement ce qui distingue un script d'un humain),
-// pause obligatoire toutes les 10 ouvertures, compteur serveur bloquant
-// (Code.gs, 30/jour), et avertissement periodique sur le volume journalier
+// paquets de taille variable avec pause de duree variable (7-13 ouvertures,
+// 15-25 min -- affine le 13/09/2026, etait fixe 10/20min), delai variable
+// plutot que fixe pour ne pas reproduire un rythme mecanique) : espacement
+// ALEATOIRE entre deux ouvertures AUTOMATIQUES (15-40s, jamais un delai fixe
+// -- un intervalle parfaitement regulier est justement ce qui distingue un
+// script d'un humain), pause obligatoire toutes les 7 a 13 ouvertures
+// (tirage aleatoire a chaque burst, voir tirerSeuilPauseProfils), compteur
+// serveur bloquant (Code.gs, 30/jour), et avertissement periodique sur le
+// volume journalier
 // (voir compterOuverturesProfilJour). Le lien "Voir le profil LinkedIn"
 // affiche par rafaleEnTeteHtml sur chaque carte reste toujours disponible en
 // secours si une ouverture est sautee -- rien n'est jamais bloque pour de
@@ -3851,7 +3858,7 @@ function rafalePrecedent() {
 // Avait ete DESACTIVEE du 11/09 au 12/09/2026 (demande de Marie, par
 // precaution suite a la restriction du 08/09, le temps de revoir ces
 // garde-fous -- voir plus haut). Reactivee le 12/09/2026 avec les reglages
-// ci-dessus (delai aleatoire, pause toutes les 10, plafond serveur 30/j).
+// ci-dessus (delai aleatoire, pause toutes les 7-13, plafond serveur 30/j).
 // Pour desactiver a nouveau si besoin : repasser ce flag a true (garde tout
 // le reste de la rafale -- defilement des cartes, boutons de decision --
 // seul le lien manuel "Voir le profil LinkedIn" reste alors disponible).
@@ -3865,8 +3872,22 @@ function tirerDelaiOuvertureProfilMs() {
   const [min, max] = DELAI_MIN_OUVERTURE_PROFIL_PLAGE_MS;
   return min + Math.random() * (max - min);
 }
-const SEUIL_PAUSE_OBLIGATOIRE_PROFILS = 10; // paquets de 10 (demande de Marie, 12/09) -- etait 25
-const DUREE_PAUSE_OBLIGATOIRE_MS = 20 * 60 * 1000; // 20 min minimum entre deux paquets
+// Plages aleatoires (pas des seuils fixes) pour la taille d'un burst et la
+// duree de la pause -- un "pile 10 puis pile 20min" reste un rythme
+// parfaitement regulier sur une journee entiere, meme avec un delai
+// aleatoire entre deux ouvertures a l'interieur du burst. Ajoute le
+// 13/09/2026 (etait fixe 10 / 20 min depuis le 12/09).
+const SEUIL_PAUSE_OBLIGATOIRE_PROFILS_PLAGE = [7, 13];
+const DUREE_PAUSE_OBLIGATOIRE_MS_PLAGE = [15 * 60 * 1000, 25 * 60 * 1000];
+function tirerSeuilPauseProfils() {
+  const [min, max] = SEUIL_PAUSE_OBLIGATOIRE_PROFILS_PLAGE;
+  return Math.round(min + Math.random() * (max - min));
+}
+function tirerDureePauseMs() {
+  const [min, max] = DUREE_PAUSE_OBLIGATOIRE_MS_PLAGE;
+  return min + Math.random() * (max - min);
+}
+let seuilPauseProfilsActuel = tirerSeuilPauseProfils();
 let compteurBurstOuverturesProfil = 0;
 let pauseOuvertureProfilJusqua = 0;
 async function ouvrirProfilRafaleThrottle(p) {
@@ -3877,6 +3898,7 @@ async function ouvrirProfilRafaleThrottle(p) {
     if (maintenant < pauseOuvertureProfilJusqua) return; // pause en cours, on saute silencieusement (lien manuel toujours dispo)
     pauseOuvertureProfilJusqua = 0;
     compteurBurstOuverturesProfil = 0;
+    seuilPauseProfilsActuel = tirerSeuilPauseProfils(); // nouveau seuil aleatoire pour le PROCHAIN burst
   }
   if (maintenant - dernierOuvertureProfilRafaleTs < delaiMinOuvertureProfilMs) return;
   // Verifie le compteur PARTAGE cote serveur (Code.gs, voir pingLinkedin_ /
@@ -3897,10 +3919,12 @@ async function ouvrirProfilRafaleThrottle(p) {
   marquerVuAujourdhui(p.lien); // alimente le quota du jour par categorie -- voir plus bas
   compteurBurstOuverturesProfil++;
   compterOuverturesProfilJour();
-  if (compteurBurstOuverturesProfil >= SEUIL_PAUSE_OBLIGATOIRE_PROFILS) {
-    pauseOuvertureProfilJusqua = maintenant + DUREE_PAUSE_OBLIGATOIRE_MS;
+  if (compteurBurstOuverturesProfil >= seuilPauseProfilsActuel) {
+    const dureePauseMs = tirerDureePauseMs();
+    pauseOuvertureProfilJusqua = maintenant + dureePauseMs;
     const heureReprise = new Date(pauseOuvertureProfilJusqua).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    alert(`Pause obligatoire : ${SEUIL_PAUSE_OBLIGATOIRE_PROFILS} profils LinkedIn ouverts d'affilée.\n\nL'ouverture automatique des profils est en pause jusqu'à ${heureReprise} (20 min) pour rester dans un rythme raisonnable vis-à-vis de LinkedIn.\n\nLe lien "Voir le profil LinkedIn" reste disponible sur chaque carte si tu dois absolument vérifier un profil pendant la pause.`);
+    const dureeMin = Math.round(dureePauseMs / 60000);
+    alert(`Pause obligatoire : ${seuilPauseProfilsActuel} profils LinkedIn ouverts d'affilée.\n\nL'ouverture automatique des profils est en pause jusqu'à ${heureReprise} (~${dureeMin} min) pour rester dans un rythme raisonnable vis-à-vis de LinkedIn.\n\nLe lien "Voir le profil LinkedIn" reste disponible sur chaque carte si tu dois absolument vérifier un profil pendant la pause.`);
   }
 }
 // Avertit périodiquement (tous les 100) sur le volume journalier de vues de
