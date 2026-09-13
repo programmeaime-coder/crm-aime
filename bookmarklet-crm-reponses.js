@@ -52,8 +52,23 @@
 // "Vous" (elle a envoye en dernier, toujours en attente) ou le prenom du
 // prospect (il/elle a repondu en dernier). C'est ce couple (Vous vs prenom) +
 // la date qui permet de classifier sans ambiguite qui a la balle.
+//
+// Mode RATTRAPAGE (fusionne ici le 2026-09-13, remplace l'ancien fichier
+// separe bookmarklet-crm-reponses-rattrapage.js) : passer RATTRAPAGE a true
+// ci-dessous UNIQUEMENT pour un usage ponctuel -- reinclut dans ce scan les
+// prospects deja "Recontacter"/"Pas maintenant" (normalement exclus pour
+// toujours du pool de candidats une fois classes, voir STATUTS_ELIGIBLES_TRI
+// dans Code.gs), pour backfiller leur Date reponse si applicable, SANS jamais
+// retoucher leur Statut/Date de rappel (voir la branche dediee dans Code.gs,
+// matcherReponses). Utilise aussi une cle de cache anti-doublons separee
+// (le but est justement de RE-envoyer des conversations deja traitees par le
+// usage quotidien, donc le cache habituel les bloquerait a tort). Remettre a
+// false et regenerer bookmarklet-crm-reponses.txt une fois le rattrapage
+// termine -- ne pas laisser ce favori en mode rattrapage au quotidien.
 
 (function () {
+  var RATTRAPAGE = false;
+
   // Un "/u/0/" avait ete ajoute ici le 2026-08-16 pour forcer un compte
   // Google specifique, suite a un blocage Drive ("Impossible d'ouvrir le
   // fichier"). Retire le 2026-08-17 : verifie en conditions reelles que
@@ -82,7 +97,7 @@
   // change (nouveau message, date qui glisse de "hier" a "2j"), la meme
   // conversation peut se represente et se renvoyer -- sans consequence, cote
   // serveur matcherReponses ecrase juste la meme ligne avec le meme resultat.
-  var CLE_STOCKAGE = "crmaime_reponses_traitees";
+  var CLE_STOCKAGE = "crmaime_reponses_traitees" + (RATTRAPAGE ? "_rattrapage" : "");
   function chargerTraites() {
     try { return JSON.parse(localStorage.getItem(CLE_STOCKAGE) || "[]").reduce(function (acc, h) { acc[h] = true; return acc; }, {}); }
     catch (err) { return {}; }
@@ -348,7 +363,7 @@
     var DELAI_ENTRE_PAQUETS = 15000;
     paquets.forEach(function (paquet, idx) {
       setTimeout(function () {
-        var url = URL_BASE + "?action=matcherReponses&session=" + encodeURIComponent(session)
+        var url = URL_BASE + "?action=matcherReponses" + (RATTRAPAGE ? "&inclureDejaClasses=1" : "") + "&session=" + encodeURIComponent(session)
           + "&pwd=" + encodeURIComponent(pwd) + "&donnees=" + encodeURIComponent(JSON.stringify(paquet));
         window.open(url, "crmaime_paquet_" + idx);
       }, idx * DELAI_ENTRE_PAQUETS);

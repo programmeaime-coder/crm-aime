@@ -2850,7 +2850,13 @@ function pistesBlocageHtml(infos) {
   `;
 }
 
-function renderStatsSection(data) {
+// Scindee en deux le 2026-09-13 (calcul vs rendu, ~300 lignes en une seule
+// fonction avant -- voir audit du 11/09) : computeStatsSectionData() fait
+// tout le calcul (funnel, regularite, tendances vs semaine derniere...),
+// renderStatsSection() ne fait plus que construire le HTML a partir de ce
+// resultat. Aucun changement de logique, pure extraction -- verifie par
+// diff du HTML genere avant/apres sur un jeu de donnees reel.
+function computeStatsSectionData(data) {
   const prospects = data.prospects;
   const clients = data.clients;
   const funnel = statsFunnelData(prospects);
@@ -3021,6 +3027,34 @@ function renderStatsSection(data) {
   const fmtJour = d => d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
   const finSemaineDerniereAffichage = new Date(finSemaineDerniereComparable.getTime());
   finSemaineDerniereAffichage.setDate(finSemaineDerniereAffichage.getDate() - 1);
+
+  return {
+    prospects, clients, funnel, regularite, appelsListe, origineCounts, segmentsOrigine,
+    offresVenduesCounts, segmentsOffresVendues, appelsNonSignes, appelsAVenir, ORIGINE_VIDE,
+    appelsRows, debutSem, debutM, debutA, contactesSemaine, contactesMois, contactesAnnee,
+    relance1Semaine, relance1Mois, relance1Annee, relance2Semaine, relance2Mois, relance2Annee,
+    recontactSemaine, appelSemaine, appelMois, appelAnnee, clientSemaine, clientMois, clientAnnee,
+    debutSemDerniere, joursEcoulesCetteSemaine, finSemaineDerniereComparable, contactesSemaineDerniere,
+    relance1SemaineDerniere, relance2SemaineDerniere, recontactSemaineDerniere, reponseSemaine,
+    reponseSemaineDerniere, appelSemaineDerniere, clientSemaineDerniere, funnelAvant, appelsAvant,
+    prospectsEnBaseAvant, tauxReponseInfosCalculees, ratioPct, pireDecalage, aUneRegulariteConnue,
+    fmtJour, finSemaineDerniereAffichage
+  };
+}
+
+function renderStatsSection(data) {
+  const {
+    prospects, clients, funnel, regularite, appelsListe, origineCounts, segmentsOrigine,
+    offresVenduesCounts, segmentsOffresVendues, appelsNonSignes, appelsAVenir, ORIGINE_VIDE,
+    appelsRows, debutSem, debutM, debutA, contactesSemaine, contactesMois, contactesAnnee,
+    relance1Semaine, relance1Mois, relance1Annee, relance2Semaine, relance2Mois, relance2Annee,
+    recontactSemaine, appelSemaine, appelMois, appelAnnee, clientSemaine, clientMois, clientAnnee,
+    debutSemDerniere, joursEcoulesCetteSemaine, finSemaineDerniereComparable, contactesSemaineDerniere,
+    relance1SemaineDerniere, relance2SemaineDerniere, recontactSemaineDerniere, reponseSemaine,
+    reponseSemaineDerniere, appelSemaineDerniere, clientSemaineDerniere, funnelAvant, appelsAvant,
+    prospectsEnBaseAvant, tauxReponseInfosCalculees, ratioPct, pireDecalage, aUneRegulariteConnue,
+    fmtJour, finSemaineDerniereAffichage
+  } = computeStatsSectionData(data);
 
   return `
     <div class="stats-hero">
